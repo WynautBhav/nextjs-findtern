@@ -150,10 +150,10 @@ export function EmployerArrivals({ start, end, now, arrivals, missing, clickable
 export type SpreadRow = { label: string; inDrive: number; offered: number; hired: number };
 
 /**
- * Offers by branch and by year: each row's track is its students in the drive, the light fill those offered and the
- * dark fill those hired. Branches share one scale and years another, so a big branch reads big against its peers.
+ * Offers by degree and by year: each row's track is its students in the drive, the light fill those offered and the
+ * dark fill those hired. Degrees share one scale and years another, so a big degree reads big against its peers.
  */
-export function DriveSpread({ branches, years }: { branches: SpreadRow[]; years: SpreadRow[] }) {
+export function DriveSpread({ degrees, years }: { degrees: SpreadRow[]; years: SpreadRow[] }) {
   const scale = (rows: SpreadRow[]) => Math.max(1, ...rows.map((r) => r.inDrive));
   const renderRow = (r: SpreadRow, max: number) => (
     <li key={r.label} className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-2 max-sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -177,9 +177,9 @@ export function DriveSpread({ branches, years }: { branches: SpreadRow[]; years:
         <span className="flex items-center gap-1.5"><span aria-hidden className="h-2 w-4 rounded-full bg-brand-700" /> Hired</span>
       </p>
       <div className="mt-3 grid gap-x-10 gap-y-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <section aria-label="By branch">
-          <h3 className="text-sm font-semibold text-ink-900">By branch</h3>
-          <ul className="mt-1 divide-y divide-ink-100">{branches.map((r) => renderRow(r, scale(branches)))}</ul>
+        <section aria-label="By degree">
+          <h3 className="text-sm font-semibold text-ink-900">By degree</h3>
+          <ul className="mt-1 divide-y divide-ink-100">{degrees.map((r) => renderRow(r, scale(degrees)))}</ul>
         </section>
         <section aria-label="By year">
           <h3 className="text-sm font-semibold text-ink-900">By year</h3>

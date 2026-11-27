@@ -64,3 +64,10 @@ test("26 Nov PDF: a company that left early reads Withdrawn, live or over; one t
   assert.deepEqual(run(false).rows.map((r) => r.status.kind), ["withdrawn", "never"]);
   assert.deepEqual(run(true).rows.map((r) => r.status.kind), ["withdrawn", "completed"]);
 });
+
+test("each company row carries what the past drive shows: joined, online time and shortlisted; time is null until online time is recorded", () => {
+  const args = { came: [{ ...came("e1", "Acme", "hr@acme.com"), shortlisted: 3 }, came("e2", "Beta", "x@beta.com")], invited: [{ company: "Delta", email: "d@delta.com" }], counts: new Map(), lastSeen: new Map(), over: false, now: NOW };
+  const tracked = buildDriveEmployers({ ...args, minutes: new Map([["e1", 95]]) });
+  assert.deepEqual(tracked.rows.map((r) => [r.company, r.shortlisted, r.minutes, r.joinedAt !== null]), [["Acme", 3, 95, true], ["Beta", 0, 0, true], ["Delta", 0, null, false]]);
+  assert.deepEqual(buildDriveEmployers({ ...args, minutes: null }).rows.map((r) => r.minutes), [null, null, null]);
+});

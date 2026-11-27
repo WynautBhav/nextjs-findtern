@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildDriveBoard, closedDriveFinding, matchInvites, type DriveStudentRef } from "./drive-board.ts";
+import { buildDriveBoard, closedDriveFinding, matchInvites, type DriveStudentRef, type OfferRow } from "./drive-board.ts";
 
 const NOW = Date.parse("2026-11-23T10:00:00Z");
 const at = (minAgo: number) => new Date(NOW - minAgo * 60_000);
@@ -361,4 +361,43 @@ test("What happened names every meet's outcome, Withdrawn and Completed included
   });
   assert.equal(b.lists.called[0].detail, "Gamma: Waiting for reply · Beta: Withdrawn · Acme: Completed");
   assert.equal(b.lists.meetings[0].detail, "Acme: Completed");
+});
+
+test("offer figures: sent, accepted, rejected, withdrawn and hired by kind all come from the same offer rows", () => {
+  const rows: OfferRow[] = [
+    { userId: "a", company: "Acme", status: "sent", hired: false, fullTime: false, createdAt: at(90) },
+    { userId: "a", company: "Beta", status: "accepted", hired: false, fullTime: false, createdAt: at(80) },
+    { userId: "b", company: "Acme", status: "processing", hired: false, fullTime: true, createdAt: at(70) },
+    { userId: "b", company: "Gamma", status: "rejected", hired: false, fullTime: false, createdAt: at(60) },
+    { userId: "c", company: "Acme", status: "declined", hired: false, fullTime: true, createdAt: at(50) },
+    { userId: "c", company: "Beta", status: "hired", hired: true, fullTime: false, createdAt: at(40) },
+    { userId: "a", company: "Gamma", status: "completed", hired: true, fullTime: true, createdAt: at(30) },
+    { userId: "b", company: "Delta", status: "withdrawn", hired: false, fullTime: false, createdAt: at(20) },
+    { userId: "c", company: "Delta", status: "withdrawn", hired: false, fullTime: true, createdAt: at(15) },
+    { userId: "x", company: "Acme", status: "accepted", hired: false, fullTime: false, createdAt: at(10) },
+    { userId: "x", company: "Acme", status: "withdrawn", hired: false, fullTime: false, createdAt: at(9) },
+  ];
+  const b = buildDriveBoard({ students, meetings: [], offers: rows, offline: null, now: NOW });
+  const mine = rows.filter((o) => ["a", "b", "c"].includes(o.userId));
+  const n = (f: (o: OfferRow) => boolean) => mine.filter(f).length;
+  const c = b.offerCounts;
+  assert.deepEqual(c, {
+    sent: n((o) => o.status !== "withdrawn"),
+    accepted: n((o) => o.hired || ["accepted", "processing", "hired", "completed"].includes(o.status)),
+    rejected: n((o) => !o.hired && ["rejected", "declined"].includes(o.status)),
+    withdrawn: n((o) => o.status === "withdrawn"),
+    hiredInternship: n((o) => o.hired && !o.fullTime),
+    hiredFullTime: n((o) => o.hired && o.fullTime),
+  });
+  assert.deepEqual(c, { sent: 7, accepted: 4, rejected: 2, withdrawn: 2, hiredInternship: 1, hiredFullTime: 1 });
+  // Sums: every standing offer is accepted, rejected or still without a reply; a hire is an accepted offer.
+  assert.equal(c.sent, c.accepted + c.rejected + n((o) => o.status === "sent"));
+  assert.equal(c.hiredInternship + c.hiredFullTime, n((o) => o.hired));
+  assert.ok(c.hiredInternship + c.hiredFullTime <= c.accepted);
+  // The tiles' lists are the same offers seen per student.
+  assert.deepEqual(b.lists.offersAccepted.map((s) => s.userId).sort(), ["a", "b", "c"]);
+  assert.deepEqual(b.lists.offersRejected.map((s) => s.userId).sort(), ["b", "c"]);
+  assert.equal(c.sent, b.offerCount);
+  assert.equal(c.withdrawn, b.withdrawnCount);
+  assert.equal(c.hiredInternship + c.hiredFullTime, 2);
 });

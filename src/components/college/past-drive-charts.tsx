@@ -89,7 +89,7 @@ export function PastDriveCharts({
       <Companies board={board} employers={employers} open={open} />
       <NudgeChart board={board} summary={summary} open={open} listPop={listPop} />
       {spread ? (
-        <Card title="Offers by branch and year" note={`${plural(L.offers.length, "student", "students")} offered · ${n(L.hired.length)} hired`} className="lg:col-span-2">
+        <Card title="Offers by degree and year" note={`${plural(L.offers.length, "student", "students")} offered · ${n(L.hired.length)} hired`} className="lg:col-span-2">
           {spread}
         </Card>
       ) : null}

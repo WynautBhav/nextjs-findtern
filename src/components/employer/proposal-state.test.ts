@@ -17,13 +17,13 @@ const hoursAgo = (h: number) => new Date(NOW.getTime() - h * H).toISOString();
 
 test("a plain accepted offer is To pay, exactly as before", () => {
   const s = offerState({ status: "accepted", hiredAt: null }, AHEAD, NOW);
-  assert.deepEqual([s.label, s.bucket, s.canPay, s.canEdit, s.canWithdraw, s.verifying, s.expiredReason, s.closedReason, s.canSendNew], ["Accepted · payment due", "accepted", true, true, true, false, null, null, false]);
+  assert.deepEqual([s.label, s.bucket, s.canPay, s.canEdit, s.canWithdraw, s.verifying, s.expiredReason, s.closedReason, s.canSendNew], ["Accepted · payment due", "accepted", true, false, false, false, null, null, false]);
 });
 
-test("pending CGPA: not payable yet (the check is not named), still editable and withdrawable", () => {
+test("pending CGPA: not payable yet (the check is not named); the employer can no longer edit or withdraw (27 Nov)", () => {
   const gate = gateFor(pending, { acceptedAt: hoursAgo(2) });
   const s = offerState({ status: "accepted", hiredAt: null, gate }, AHEAD, NOW);
-  assert.deepEqual([s.label, s.tone, s.bucket, s.canPay, s.canWithdraw, s.verifying], ["Accepted · not payable yet", "waiting", "verifying", false, true, true]);
+  assert.deepEqual([s.label, s.tone, s.bucket, s.canPay, s.canWithdraw, s.verifying], ["Accepted · not payable yet", "waiting", "verifying", false, false, true]);
   assert.match(s.next, /Payment opens once Findtern's final checks are done \(usually 24-48 h\)/);
   assert.doesNotMatch(`${s.label} ${s.next}`, /CGPA|verif/i);
   assert.equal(s.gate?.state, "pending");
@@ -37,18 +37,18 @@ test("overdue CGPA (49 h) is still not payable, with the same neutral wording", 
   assert.doesNotMatch(`${s.label} ${s.next}`, /CGPA|verif/i);
 });
 
-test("incorrect and unconfirmed: a correction notice with the two scores, no pay, withdraw open", () => {
+test("incorrect and unconfirmed: a correction notice with the two scores, confirm to continue, no pay and no withdraw", () => {
   const gate = gateFor({ ...pending, status: "incorrect", correctedScore: "7.4", decidedAt: hoursAgo(1) }, { acceptedAt: hoursAgo(30) });
   const s = offerState({ status: "accepted", hiredAt: null, gate }, AHEAD, NOW);
-  assert.deepEqual([s.label, s.bucket, s.canPay, s.canWithdraw], ["CGPA corrected · confirm", "verifying", false, true]);
-  assert.match(s.next, /corrected the candidate's CGPA from 8\.1 to 7\.4/);
+  assert.deepEqual([s.label, s.bucket, s.canPay, s.canWithdraw], ["CGPA corrected · confirm", "verifying", false, false]);
+  assert.match(s.next, /corrected the candidate's CGPA from 8\.1 to 7\.4\. Confirm to continue to payment\.$/);
 });
 
 test("incorrect and unconfirmed without Pro: the notice says it was corrected, with no scores", () => {
   const gate = withoutCgpaScores(gateFor({ ...pending, status: "incorrect", correctedScore: "7.4", decidedAt: hoursAgo(1) }, { acceptedAt: hoursAgo(30) }), false);
   const s = offerState({ status: "accepted", hiredAt: null, gate }, AHEAD, NOW);
-  assert.deepEqual([s.label, s.bucket, s.canPay, s.canWithdraw], ["CGPA corrected · confirm", "verifying", false, true]);
-  assert.match(s.next, /corrected the candidate's CGPA\. Confirm to continue/);
+  assert.deepEqual([s.label, s.bucket, s.canPay, s.canWithdraw], ["CGPA corrected · confirm", "verifying", false, false]);
+  assert.match(s.next, /corrected the candidate's CGPA\. Confirm to continue to payment\.$/);
   assert.doesNotMatch(JSON.stringify(s), /8\.1|7\.4/);
 });
 

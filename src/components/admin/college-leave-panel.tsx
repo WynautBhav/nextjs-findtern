@@ -105,7 +105,7 @@ export function CollegeLeavePanel({ collegeId, canEdit, members, pending }: { co
                 <p className="break-all text-xs text-text-subtle">
                   {r.email} · <span className="whitespace-nowrap">asked {formatDate(r.requestedAt)}</span>
                 </p>
-                {r.reason ? <p className="mt-1 break-words text-xs">“{r.reason}”</p> : null}
+                {r.reason ? <p className="mt-1 whitespace-pre-line break-words text-xs">“{r.reason}”</p> : null}
                 {canEdit ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button type="button" disabled={busy} onClick={() => decide(r, "approve")} className={buttonClass({ variant: "dark", size: "sm" })}>

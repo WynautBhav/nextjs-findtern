@@ -65,6 +65,12 @@ export function ActivationCard({
   const [promoError, setPromoError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [state, setState] = useState<"idle" | "busy" | "paid">(alreadyPaid ? "paid" : "idle");
+  // Paid or waived somewhere else: the next server read (router.refresh, a focus refresh) turns the card to paid.
+  const [seenPaid, setSeenPaid] = useState(alreadyPaid);
+  if (seenPaid !== alreadyPaid) {
+    setSeenPaid(alreadyPaid);
+    if (alreadyPaid) setState("paid");
+  }
   const [error, setError] = useState<string | null>(null);
   const [adult, setAdult] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);

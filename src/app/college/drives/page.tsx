@@ -17,6 +17,7 @@ import { timeUntil } from "@/lib/college/time-left";
 import { requireCollegeContext } from "@/lib/college/scope";
 import { shortDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
   const answered = all.reduce((n, d) => n + (meets.get(d.drive.id)?.accepted ?? 0), 0);
   return (
     <div className="space-y-6">
+      <LiveRefresh everyMs={60_000} />
       <CollegeHero
         title="Campus drives"
         lede="One link per drive. The employers you send it to sign in and see only your verified students, while the drive is open."

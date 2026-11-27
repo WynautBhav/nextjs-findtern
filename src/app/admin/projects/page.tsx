@@ -240,7 +240,7 @@ export default async function AdminProjectsPage({
               row.takenDownAt ? (
                 <div className="min-w-0 whitespace-normal lg:max-w-40">
                   <StatusBadge tone="danger" label="Taken down" />
-                  <p className="mt-1 line-clamp-2 break-words text-[0.8125rem] text-text-subtle" title={row.takenDownReason ?? ""}>{row.takenDownReason}</p>
+                  <p className="mt-1 line-clamp-2 whitespace-pre-line break-words text-[0.8125rem] text-text-subtle" title={row.takenDownReason ?? ""}>{row.takenDownReason}</p>
                   <Link href={`/admin/messages?q=${encodeURIComponent(row.id)}`} className="mt-1 inline-block text-[0.8125rem] font-medium text-primary underline-offset-4 hover:underline">Messages about this project</Link>
                 </div>
               ) : (

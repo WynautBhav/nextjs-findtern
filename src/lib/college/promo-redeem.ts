@@ -12,6 +12,7 @@ import { settleInternOrder } from "@/lib/payments";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { internProfileStatus } from "@/lib/profile-complete";
 import { quotePromo } from "@/lib/promo";
+import { COLLEGE_CODE_RETIRED } from "@/lib/promo-rules";
 
 import { collegeAccountState } from "./account-state";
 import {
@@ -37,7 +38,7 @@ import {
 
 export type PromoOutcome =
   | { ok: true; alreadyPaid: boolean; collegeName: string | null; kind: "drive" | "promo" | "none" }
-  | { ok: false; status: number; error: string; reason: PromoRefusal | "not_college_account" | "bad_shape" | "settle" | "seats" | "busy" | "profile"; kind: "drive" | "promo" | "none"; mismatch?: string[] };
+  | { ok: false; status: number; error: string; reason: PromoRefusal | "not_college_account" | "bad_shape" | "settle" | "seats" | "busy" | "profile" | "retired"; kind: "drive" | "promo" | "none"; mismatch?: string[] };
 
 const generic = (reason: PromoRefusal | "bad_shape", kind: "drive" | "promo" | "none", mismatch?: string[]): PromoOutcome => ({ ok: false, status: 400, error: COLLEGE_PROMO_FAIL, reason, kind, ...(mismatch?.length ? { mismatch } : {}) });
 
@@ -156,6 +157,8 @@ export async function redeemCollegePromo(input: { uid: string; typed: unknown })
   // The college's shared promo code.
   const fee = await getInternActivationFeeMinor();
   const quote = await quotePromo({ code: typed.code, subjectId: uid, orderMinor: fee, currency: "INR", audience: "intern" });
+  // The shared college code is retired: say so plainly. It tells a prober nothing, the code no longer opens anything.
+  if (!quote.ok && quote.error === COLLEGE_CODE_RETIRED) return { ok: false, status: 400, error: COLLEGE_CODE_RETIRED, reason: "retired", kind: "promo" };
   const entries = await rosterEntriesFor(state.collegeId, uid, student.email);
   const d = collegePromoDecision({
     hasAdultConsent: true,

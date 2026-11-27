@@ -46,8 +46,8 @@ export const KINDS: Record<string, UploadKind> = {
   employer_logo: { roles: ["employer"], types: IMAGES, max: IMAGE_MAX, isPublic: true },
   // A placement officer's college logo (shown on the drive page employers open). The route writes it to the officer's own college only.
   college_logo: { roles: ["college"], types: IMAGES, max: IMAGE_MAX, isPublic: true },
-  // PDF, PNG or JPG, as legacy accepted (employer-orders full-time dialog).
-  offer_letter: { roles: ["employer"], types: ["application/pdf", "image/png", "image/jpeg"], max: 10 * MB },
+  // The full-time offer letter is a PDF and nothing else (27 Nov). Legacy took images too; letters stored that way still open.
+  offer_letter: { roles: ["employer"], types: ["application/pdf"], max: 10 * MB },
   cms_image: { roles: ["admin"], types: IMAGES, max: IMAGE_MAX, isPublic: true },
   // Shared: employers may still attach a PDF; interns may not.
   support: { roles: ["intern", "employer"], types: [...DOCS, ...VIDEO], internTypes: [...IMAGES, ...VIDEO], max: 10 * MB },
@@ -81,7 +81,6 @@ export const WEBP: Record<string, { maxPx: number; quality: number }> = {
   college_logo: { maxPx: 1200, quality: 85 },
   cms_image: { maxPx: 2400, quality: 82 },
   // Shared kinds: only their image files are converted; a PDF or video skips this (see prepareUpload).
-  offer_letter: { maxPx: 2000, quality: 85 },
   support: { maxPx: 2000, quality: 80 },
 };
 
@@ -123,7 +122,11 @@ export function checkType(kind: UploadKind, type: string, role?: SessionData["ro
   return {
     ok: false,
     status: 415,
-    error: imageList && !types.includes("application/pdf") ? `Upload a ${imageList} image. PDFs aren't accepted for this file.` : "That file type isn't accepted here",
+    error: imageList && !types.includes("application/pdf")
+      ? `Upload a ${imageList} image. PDFs aren't accepted for this file.`
+      : types.every((t) => t === "application/pdf")
+        ? "Upload the file as a PDF."
+        : "That file type isn't accepted here",
   };
 }
 
@@ -146,7 +149,9 @@ export async function prepareUpload(
       status: 415,
       error: imagesOnly
         ? "That file is not what its name says. Upload the original JPG, PNG or WebP image."
-        : "That file is not what its name says. Upload the original PDF, JPG or PNG.",
+        : kind.types.every((t) => t === "application/pdf")
+          ? "That file is not a PDF. Upload the original PDF."
+          : "That file is not what its name says. Upload the original PDF, JPG or PNG.",
     };
   }
   let out = bytes;

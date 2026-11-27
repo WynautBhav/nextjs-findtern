@@ -70,25 +70,71 @@ export type StudentFacts = {
   semester?: number | null;
 };
 
+/** Spelled-out degrees to their short code, so "Bachelor of Technology" and "B. Tech" read the same. */
+const DEGREE_NAMES: [RegExp, string][] = [
+  [/bachelors? (?:of|in) technology/g, "btech"],
+  [/bachelors? (?:of|in) engineering/g, "be"],
+  [/bachelors? (?:of|in) architecture/g, "barch"],
+  [/bachelors? (?:of|in) business administration/g, "bba"],
+  [/bachelors? (?:of|in) computer applications?/g, "bca"],
+  [/bachelors? (?:of|in) commerce/g, "bcom"],
+  [/bachelors? (?:of|in) science/g, "bsc"],
+  [/bachelors? (?:of|in) arts/g, "ba"],
+  [/bachelors? (?:of|in) design/g, "bdes"],
+  [/bachelors? (?:of|in) pharmacy/g, "bpharm"],
+  [/bachelors? (?:of|in) laws?/g, "llb"],
+  [/masters? (?:of|in) business administration/g, "mba"],
+  [/masters? (?:of|in) technology/g, "mtech"],
+  [/masters? (?:of|in) computer applications?/g, "mca"],
+  [/masters? (?:of|in) science/g, "msc"],
+  [/masters? (?:of|in) arts/g, "ma"],
+  [/masters? (?:of|in) commerce/g, "mcom"],
+  [/masters? (?:of|in) engineering/g, "mtech"],
+  [/masters? (?:of|in) architecture/g, "march"],
+  [/masters? (?:of|in) pharmacy/g, "mpharm"],
+  [/masters? (?:of|in) laws?/g, "llm"],
+];
+
+/** Duration in years by degree, first match wins: integrated and law-with-a-first-degree courses run 5, so they come first. */
+const DEGREE_YEARS: [RegExp, number][] = [
+  [/ (?:btech|be|bba|bsc|ba|bcom|bs) (?:(?:and|with|dual|integrated|degree) )*(?:mtech|mba|msc|ma|mcom|ms) /, 5],
+  [/ (?:ba|bba|bcom|bsc) llb /, 5],
+  [/ (?:integrated|barch) /, 5],
+  [/ (?:btech|be|bdes|bpharm) /, 4],
+  [/ bsc (?:hons )?(?:nursing|agriculture|agri|forestry) /, 4],
+  [/ (?:bca|bba|bbm|bms|bcom|bsc|ba|bvoc|bjmc|llb) /, 3],
+  [/ (?:mba|mca|mtech|msc|ma|mcom|pgdm|msw|march|mpharm|mdes|llm) /, 2],
+];
+
 /**
- * How many years the degree in a branch name runs, when the name says so: 4 for B.Tech / B.E., 3 for BCA, BBA, B.Com,
- * B.Sc, BA and the like. Null when the name doesn't tell (the year and semester rule below then decides).
+ * How many years a degree runs, from its name ("B. Tech", "btech", "Bachelor of Technology" are one): B.Tech, B.E., B.Des
+ * and B.Pharm 4; B.Arch, BS-MS, integrated (BBA-MBA, B.Tech-M.Tech) and BA/BBA LLB 5; BCA, BBA, B.Com, B.Sc, BA, LLB 3;
+ * MBA, MCA, M.Tech, M.Sc, MA, M.Com 2. Null when the text doesn't say (a branch like CSE or ME is not a degree).
  */
-export function degreeYears(branch: string | null | undefined): number | null {
-  const b = ` ${(branch ?? "").toLowerCase().replace(/[.\s]+/g, " ").trim()} `;
-  if (/ (b ?tech|b ?e|be|b ?arch|bs ?ms) /.test(b)) return 4;
-  if (/ (bca|bba|bbm|bms|b ?com|b ?sc|ba|b ?voc|bjmc) /.test(b)) return 3;
-  return null;
+export function degreeYears(text: string | null | undefined): number | null {
+  let t = (text ?? "").toLowerCase().replace(/\b([a-z])\./g, "$1").replace(/[^a-z0-9]+/g, " ").replace(/&/g, " ");
+  for (const [re, short] of DEGREE_NAMES) t = t.replace(re, short);
+  // "b tech" -> "btech", "m sc" -> "msc", "ll b" -> "llb".
+  t = ` ${t.replace(/\b([bm]) (?=(?:tech|sc|com|arch|des|pharm|voc|ca|ed|e|a)\b)/g, "$1").replace(/\bll b\b/g, "llb").replace(/\bll m\b/g, "llm").trim()} `;
+  return DEGREE_YEARS.find(([re]) => re.test(t))?.[1] ?? null;
 }
 
 /**
- * Full-time hiring is for the final year: the last year of the degree (B.Tech 4th, BCA 3rd) when the branch names it,
- * otherwise 4th year, or a 3rd year already in semester 6 or later.
+ * Full-time hiring is for the final year: the last two semesters of the degree (B.Tech sem 7-8, BBA sem 5-6). The degree
+ * comes from the student's degree, else their branch. The semester (the student's own) is used when the year is missing;
+ * when both are on file and disagree, the stricter one wins, so a self-entered semester never opens full-time to a student
+ * the college lists in an earlier year (B.Tech year 4 but semester 5 is not final year either). A degree that names no
+ * length keeps the old rule: 4th year, a 3rd year in semester 6 or later, or semester 7+ with no year on file.
  */
-export function fullTimeReady(s: Pick<StudentFacts, "year" | "semester"> & { branch?: string | null }): boolean {
-  const years = degreeYears(s.branch);
-  if (years !== null) return s.year !== null && s.year >= years;
-  return s.year === 4 || (s.year === 3 && (s.semester ?? 0) >= 6);
+export function fullTimeReady(s: Pick<StudentFacts, "year" | "semester"> & { branch?: string | null; degree?: string | null }): boolean {
+  const years = degreeYears(s.degree) ?? degreeYears(s.branch);
+  const sem = s.semester && s.semester > 0 ? s.semester : null;
+  if (years !== null) {
+    const yearOk = s.year === null ? null : s.year >= years;
+    const semOk = sem === null ? null : sem >= years * 2 - 1;
+    return (yearOk ?? true) && (semOk ?? true) && (yearOk !== null || semOk !== null);
+  }
+  return s.year === 4 || (s.year === 3 && (sem ?? 0) >= 6) || (s.year === null && (sem ?? 0) >= 7);
 }
 
 /** The first of these live drives (ordered as given, earliest to end) the student may enter, or null: the drive banner's pick. */

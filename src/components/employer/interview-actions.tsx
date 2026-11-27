@@ -128,7 +128,7 @@ export function InterviewActions({
 
   async function remind() {
     if (await post("send-reminder", {}, "send a reminder")) {
-      setNotice("Reminder sent to the candidate.");
+      setNotice("Reminder sent to the candidate by email and in their Findtern notifications.");
       router.refresh();
     }
   }

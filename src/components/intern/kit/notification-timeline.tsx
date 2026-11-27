@@ -141,7 +141,7 @@ export function NotificationTimeline({
                           </time>
                         ) : null}
                       </span>
-                      <span className="mt-1 block text-pretty text-sm leading-relaxed text-ink-600">{n.message}</span>
+                      <span className="mt-1 block whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-600">{n.message}</span>
                       {n.href ? (
                         <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-700">
                           Open

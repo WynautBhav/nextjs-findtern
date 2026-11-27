@@ -122,6 +122,15 @@ export function collegeCodeMemberProblem(activeMembershipCollegeId: string | nul
     : null;
 }
 
+/**
+ * The college's shared seat code is retired (bug sheet 27 Nov): nobody new joins or pays with it. Students who already used it keep
+ * their paid row and their seat stays counted; new students use the personal roster code their college sends them.
+ */
+export const COLLEGE_CODE_RETIRED = "This code is no longer used. Ask your placement office for your personal code.";
+export function collegeCodeRetiredProblem(collegeId: string | null | undefined, audience: string): string | null {
+  return collegeId && audience === "intern" ? COLLEGE_CODE_RETIRED : null;
+}
+
 export const SEATS_USED_UP = "This college's free seats are used up";
 export const DEFAULT_COLLEGE_SEATS = 300;
 

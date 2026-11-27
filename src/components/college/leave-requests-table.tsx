@@ -137,7 +137,7 @@ export function LeaveRequestsTable({ initial }: { initial: CollegeLeaveRow[] }) 
                       <p className="mt-0.5 text-sm text-ink-600">
                         {[r.year ? `Year ${r.year}` : null, r.branch, `asked ${day(r.requestedAt)}`].filter(Boolean).join(" · ")}
                       </p>
-                      {r.reason ? <p className="mt-2 break-words rounded-apple-sm bg-ink-50 p-2 text-sm text-ink-800">“{r.reason}”</p> : null}
+                      {r.reason ? <p className="mt-2 whitespace-pre-line break-words rounded-apple-sm bg-ink-50 p-2 text-sm text-ink-800">“{r.reason}”</p> : null}
                       {r.earlierRequests > 0 ? (
                         <p className="mt-2 text-xs text-ink-600">
                           Asked before: {r.earlierRequests} {r.earlierRequests === 1 ? "time" : "times"}
@@ -183,7 +183,8 @@ export function LeaveRequestsTable({ initial }: { initial: CollegeLeaveRow[] }) 
                   {WHO[r.decidedByType ?? ""] ?? "Closed"}
                   {r.decidedAt ? ` · ${day(r.decidedAt)}` : ""} · asked {day(r.requestedAt)}
                 </p>
-                {r.decisionNote ? <p className="mt-1 break-words text-sm text-ink-700">Note: {r.decisionNote}</p> : null}
+                {r.reason ? <p className="mt-2 whitespace-pre-line break-words rounded-apple-sm bg-ink-50 p-2 text-sm text-ink-800">“{r.reason}”</p> : null}
+                {r.decisionNote ? <p className="mt-1 whitespace-pre-line break-words text-sm text-ink-700">Note: {r.decisionNote}</p> : null}
               </Surface>
             ))}
           </ul>

@@ -4,9 +4,8 @@ import { useState } from "react";
 import { BellRing, Check } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import type { NudgeKind } from "@/lib/college/nudge-plan";
 import { cn } from "@/lib/utils";
-
-type Kind = "online" | "offer" | "interview" | "meeting" | "open_to_work";
 
 /**
  * Chase one or many students. The server skips anyone nudged for the same
@@ -21,7 +20,7 @@ export function NudgeButton({
   className,
 }: {
   userIds: string[];
-  kind: Kind;
+  kind: NudgeKind;
   label?: string;
   size?: "sm" | "xs";
   /** The one thing to do on the screen (Nudge all during a live drive): amber. */

@@ -6,7 +6,7 @@ import type { EmailContent } from "../emails";
  * frantic officer can't spam a student. Pure (no DB, no env): sendNudge feeds
  * it the last nudge time and the link builder, and it decides what goes out.
  */
-export const NUDGE_KINDS = ["online", "offer", "interview", "meeting", "open_to_work"] as const;
+export const NUDGE_KINDS = ["online", "offer", "interview", "meeting", "meeting_reminder", "open_to_work"] as const;
 export type NudgeKind = (typeof NUDGE_KINDS)[number];
 export const NUDGE_COOLDOWN_MS = 10 * 60_000;
 
@@ -46,6 +46,11 @@ const COPY: Record<NudgeKind, (college: string) => { title: string; message: str
     title: `${c}: an employer asked you for a call`,
     message: "Open Findtern and accept or decline the meeting request. Employers in the drive are waiting.",
     url: nudgeHref("meeting"),
+  }),
+  meeting_reminder: (c) => ({
+    title: `${c}: you have a meeting booked`,
+    message: "Your meeting with an employer in the drive is booked. Open Findtern before it starts and join on time.",
+    url: nudgeHref("meeting_reminder"),
   }),
   open_to_work: (c) => ({
     title: `${c}: turn on "Open to work"`,

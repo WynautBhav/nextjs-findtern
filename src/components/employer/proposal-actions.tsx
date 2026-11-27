@@ -55,7 +55,7 @@ export function CgpaAckButton({ proposalId, className }: { proposalId: string; c
 
 /**
  * Pay and withdraw on the proposal page. What is allowed comes from
- * `offerState` (shared with the list), so the page never offers an action
+ * `offerState` (shared with the list, read from lib/proposal-permissions.ts), so the page never offers an action
  * the server refuses. Edit is the sibling `ProposalOfferForm`.
  *
  * Withdraw confirms in a dialog with Cancel focused (QA-115). The inline
@@ -67,17 +67,11 @@ export function ProposalActions({
   status,
   canPay,
   canWithdraw,
-  withdrawLabel = "Withdraw offer",
-  withdrawSecondary = false,
 }: {
   proposalId: string;
   status: string;
   canPay: boolean;
   canWithdraw: boolean;
-  /** The button's words ("Withdraw proposal" while a CGPA correction waits for the employer). */
-  withdrawLabel?: string;
-  /** Withdraw is the quiet second choice beside another primary action on the page (Confirm and continue). */
-  withdrawSecondary?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -87,10 +81,7 @@ export function ProposalActions({
   async function withdraw() {
     const ok = await ask({
       title: "Withdraw this offer?",
-      body:
-        status === "accepted"
-          ? "The candidate accepted this offer. Withdrawing tells them it won't go ahead. This can't be undone."
-          : "The candidate can no longer accept it, and they are told. This can't be undone.",
+      body: "The candidate can no longer accept it, and they are told. This can't be undone.",
       confirmLabel: "Yes, withdraw the offer",
     });
     if (!ok) return;
@@ -132,14 +123,10 @@ export function ProposalActions({
           type="button"
           onClick={() => void withdraw()}
           disabled={busy}
-          className={buttonClass(
-            withdrawSecondary
-              ? { variant: "outline", block: true, className: "min-h-11" }
-              : { variant: "ghost", block: true, className: "min-h-11 text-ink-700 hover:bg-danger-soft hover:text-danger" },
-          )}
+          className={buttonClass({ variant: "ghost", block: true, className: "min-h-11 text-ink-700 hover:bg-danger-soft hover:text-danger" })}
         >
           {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-          {withdrawLabel}
+          Withdraw offer
         </button>
       ) : null}
       {error ? (

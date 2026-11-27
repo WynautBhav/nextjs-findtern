@@ -73,14 +73,15 @@ test("slots start on the quarter hour", async () => {
   assert.equal(isQuarterHourWall("2026-11-03T10:07"), false);
 });
 
-test("suggested slots: the next quarter hour, then +1h and +2h", async () => {
+test("suggested slots: the next quarter hour, then the two quarters after it", async () => {
   const { suggestedSlots } = await import("./employer-interview-rules.ts");
-  // Bug sheet 7 (Sheet2 r2): 12:34 -> 12:45, 13:45, 14:45.
-  // 12:34 IST on 19 Oct 2026 = 07:04 UTC.
-  assert.deepEqual(suggestedSlots(Date.UTC(2026, 9, 19, 7, 4), "Asia/Kolkata"), ["2026-10-19T12:45", "2026-10-19T13:45", "2026-10-19T14:45"]);
+  // Owner, 27 Nov: at 2:07 pm the slots are 2:15, 2:30, 2:45. 12:34 IST on 19 Oct 2026 = 07:04 UTC -> 12:45, 13:00, 13:15.
+  assert.deepEqual(suggestedSlots(Date.UTC(2026, 9, 19, 7, 4), "Asia/Kolkata"), ["2026-10-19T12:45", "2026-10-19T13:00", "2026-10-19T13:15"]);
+  // 14:07 IST (08:37 UTC) -> 14:15, 14:30, 14:45.
+  assert.deepEqual(suggestedSlots(Date.UTC(2026, 9, 19, 8, 37), "Asia/Kolkata"), ["2026-10-19T14:15", "2026-10-19T14:30", "2026-10-19T14:45"]);
   // 10:07 IST -> 10:15; 10:14 IST -> 10:15; 10:16 IST -> 10:30.
   const now = Date.UTC(2026, 9, 19, 4, 37);
-  assert.deepEqual(suggestedSlots(now, "Asia/Kolkata"), ["2026-10-19T10:15", "2026-10-19T11:15", "2026-10-19T12:15"]);
+  assert.deepEqual(suggestedSlots(now, "Asia/Kolkata"), ["2026-10-19T10:15", "2026-10-19T10:30", "2026-10-19T10:45"]);
   assert.equal(suggestedSlots(Date.UTC(2026, 9, 19, 4, 44), "Asia/Kolkata")[0], "2026-10-19T10:15");
   assert.equal(suggestedSlots(Date.UTC(2026, 9, 19, 4, 46), "Asia/Kolkata")[0], "2026-10-19T10:30");
   // New York, from the employer's own zone (Sheet2 r3): 12:34 EDT -> 12:45.
@@ -88,7 +89,7 @@ test("suggested slots: the next quarter hour, then +1h and +2h", async () => {
   // Exactly on a quarter moves to the next one; crosses midnight cleanly.
   assert.equal(suggestedSlots(Date.UTC(2026, 9, 19, 18, 0), "Asia/Kolkata")[0], "2026-10-19T23:45"); // 23:30 IST
   const late = Date.UTC(2026, 9, 19, 18, 15); // 23:45 IST
-  assert.deepEqual(suggestedSlots(late, "Asia/Kolkata"), ["2026-10-20T00:00", "2026-10-20T01:00", "2026-10-20T02:00"]);
+  assert.deepEqual(suggestedSlots(late, "Asia/Kolkata"), ["2026-10-20T00:00", "2026-10-20T00:15", "2026-10-20T00:30"]);
 });
 
 test("a picked meeting blocks a new booking until its 30 minutes are over", () => {

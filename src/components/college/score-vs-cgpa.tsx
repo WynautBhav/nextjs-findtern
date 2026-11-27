@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 
-import { HIGH_CGPA, STRONG_SCORE, quadrantOf, type Quadrant } from "@/lib/college/insights";
+import { HIGH_CGPA, QUADRANT_VIEW, STRONG_SCORE, quadrantCounts, quadrantList, quadrantOf, type Quadrant } from "@/lib/college/insights";
 import { cgpaText } from "@/lib/college/master-row";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +23,8 @@ function jitter(id: string, n: number) {
   return ((h >>> 0) % 1000) / 1000 - 0.5;
 }
 
-const LIST = 6;
+/** Students listed under a tile. Past this the list says "See all N" and opens Master data, so a big college is never a long list here. */
+const LIST = 8;
 
 /**
  * Findtern score against CGPA, one dot per interviewed student, cut at score 7 and CGPA 7.5. The four groups beside the
@@ -37,10 +38,9 @@ export function ScoreVsCgpa({ points }: { points: ScorePoint[] }) {
   const x = (cg: number) => L + ((cg - minCg) / (10 - minCg)) * (W - L - R);
   const y = (sc: number) => T + (1 - sc / 10) * (H - T - B);
   const groupOf = new Map(points.map((p) => [p.userId, quadrantOf(p)!]));
-  const counts = Object.fromEntries(QUADS.map((q) => [q.id, 0])) as Record<Quadrant, number>;
-  for (const p of points) counts[groupOf.get(p.userId)!]++;
+  const counts = quadrantCounts(points);
   const xTicks = Array.from({ length: 10 - minCg + 1 }, (_, i) => minCg + i);
-  const listed = pick ? points.filter((p) => groupOf.get(p.userId) === pick).sort((a, b) => b.score - a.score || b.cgpa - a.cgpa) : [];
+  const listed = pick ? quadrantList(points, pick, LIST) : null;
 
   return (
     <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
@@ -101,13 +101,13 @@ export function ScoreVsCgpa({ points }: { points: ScorePoint[] }) {
             );
           })}
         </div>
-        {pick ? (
+        {pick && listed ? (
           <div className="mt-4">
             <p className="text-xs text-text-subtle">
-              {QUADS.find((q) => q.id === pick)!.name}, highest score first{listed.length > LIST ? ` · ${LIST} of ${listed.length}` : ""}
+              {QUADS.find((q) => q.id === pick)!.name}, highest score first{listed.more > 0 ? ` · top ${listed.shown.length} of ${listed.total}` : ""}
             </p>
             <ul className="mt-1 divide-y divide-ink-100">
-              {listed.slice(0, LIST).map((p) => (
+              {listed.shown.map((p) => (
                 <li key={p.userId}>
                   <Link href={`/college/students/${p.userId}`} className="flex items-center gap-3 py-2 text-sm hover:underline hover:underline-offset-4 focus-visible:outline-2 focus-visible:outline-brand-600">
                     <span className="min-w-0 flex-1 truncate font-medium text-ink-900">{p.name}</span>
@@ -117,6 +117,11 @@ export function ScoreVsCgpa({ points }: { points: ScorePoint[] }) {
                 </li>
               ))}
             </ul>
+            {listed.more > 0 ? (
+              <Link href={`/college/master-data?view=${QUADRANT_VIEW[pick]}`} className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-brand-700 underline underline-offset-4 hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-brand-600">
+                See all <span className="nums mx-1">{listed.total}</span> in Master data
+              </Link>
+            ) : null}
           </div>
         ) : (
           <p className="mt-4 text-sm text-text-subtle">Press a group to see its students.</p>

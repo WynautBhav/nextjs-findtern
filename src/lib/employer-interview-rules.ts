@@ -242,9 +242,9 @@ export function wallNow(timeZone: string, now: number = Date.now()): string {
 }
 
 /**
- * Suggested slots (bug sheet 7, Sheet2 r2): the next quarter hour (:00, :15,
- * :30, :45) after now in the interview's timezone, then one and two hours
- * after it: 12:34 → 12:45, 13:45, 14:45. Wall-clock strings, editable by the
+ * Suggested slots (owner, 27 Nov): the next quarter hour (:00, :15, :30, :45)
+ * after now in the interview's timezone, then the next two quarters:
+ * 2:07 → 2:15, 2:30, 2:45. Wall-clock strings, editable by the
  * employer. Exactly on a quarter moves to the next one, so a slot is never
  * "now".
  */
@@ -252,7 +252,7 @@ export function suggestedSlots(now: number, timeZone: string): [string, string, 
   const base = wallEpoch(now, timeZone);
   const quarter = 15 * 60_000;
   const first = (Math.floor(base / quarter) + 1) * quarter;
-  return [wallString(first), wallString(first + 60 * 60_000), wallString(first + 120 * 60_000)];
+  return [wallString(first), wallString(first + quarter), wallString(first + 2 * quarter)];
 }
 
 /**

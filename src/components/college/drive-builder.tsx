@@ -588,9 +588,6 @@ function InvitedEmployers({ value, onChange, showErrors }: { value: InvitedRow[]
         </h2>
         <p className="mt-0.5 text-sm text-text-subtle">Each new employer is emailed a link to join the drive, and gets an alert if it already has a Findtern account. The drive page shows who came in and who you still need to chase.</p>
       </header>
-      <p role="note" className="border-b border-accent-300/60 bg-accent-100/60 px-5 py-3 text-sm text-accent-700">
-        Sent on WhatsApp
-      </p>
 
       <div className="space-y-3 px-5 py-4">
         <div aria-hidden className="hidden gap-2 text-xs font-medium text-text-subtle xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.4fr)_5.5rem]">

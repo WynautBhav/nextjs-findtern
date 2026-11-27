@@ -366,7 +366,7 @@ export function DetailRow({
   return (
     <div className="flex flex-col gap-1 py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
       <dt className="shrink-0 text-sm text-text-subtle">{label}</dt>
-      <dd className={cn("min-w-0 text-sm font-medium text-ink-900 [overflow-wrap:anywhere] sm:text-right", mono && "tabular-nums")}>
+      <dd className={cn("min-w-0 whitespace-pre-line text-sm font-medium text-ink-900 [overflow-wrap:anywhere] sm:text-right", mono && "tabular-nums")}>
         {value}
       </dd>
     </div>

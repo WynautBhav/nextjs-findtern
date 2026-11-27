@@ -4,7 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import { isFullWaiver, waiverRowProblem } from "@/lib/full-waiver";
 import { chargePromoMiss, chargeWaiverRedeem, promoBlockedMessage, promoGuessBlock, waiverBlockedMessage, waiverRedeemBlock } from "@/lib/promo-throttle";
 import { clientIp } from "@/lib/security/rate-limit";
-import { INVALID_PROMO, collegeCodeMemberProblem, collegeCodeProblem, employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoHoldProblem, PROMO_HOLD_MINUTES, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
+import { INVALID_PROMO, collegeCodeMemberProblem, collegeCodeRetiredProblem, collegeCodeProblem, employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoHoldProblem, PROMO_HOLD_MINUTES, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
 
 /**
  * Promo codes against a real order: shared by the intern activation payment
@@ -45,6 +45,9 @@ export async function quotePromo(input: {
   const audience = input.audience ?? (await audienceOf(input.subjectId));
   const scopeProblem = promoAudienceProblem(row.appliesTo, audience);
   if (scopeProblem) return { ok: false, error: scopeProblem, status: 400 };
+
+  const retired = collegeCodeRetiredProblem(row.collegeId, audience);
+  if (retired) return { ok: false, error: retired, status: 400 };
 
   // A full waiver is the one code that takes the hiring fee too: the whole order is discountable.
   const waiver = isFullWaiver(row);

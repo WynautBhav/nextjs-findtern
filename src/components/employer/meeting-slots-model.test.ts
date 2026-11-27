@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { cannotSend, hasSlotProblem, offerProblem, slotProblem, slotProblems } from "./meeting-slots-model.ts";
+import { cannotSend, hasSlotProblem, offerProblem, slotProblem, slotProblems, slotWindow } from "./meeting-slots-model.ts";
 
 // 2026-11-19 11:00 in India.
 const NOW = Date.parse("2026-11-19T11:00:00+05:30");
@@ -62,4 +62,17 @@ test("cannotSend joins the whole-offer rule with the per-slot ones", () => {
   assert.equal(cannotSend(THREE.slice(0, 2), IST, NOW), true);
   assert.equal(cannotSend(["2026-11-18T10:00", THREE[1], THREE[2]], IST, NOW), true);
   assert.equal(cannotSend([], IST, NOW), true);
+});
+
+test("at 2:07 pm the suggested slots (2:15, 2:30, 2:45) are all pickable and send; 2:00 is not (owner, 27 Nov)", async () => {
+  const { suggestedSlots } = await import("../../lib/employer-interview-rules.ts");
+  const now = Date.parse("2026-11-19T14:07:00+05:30");
+  const slots = suggestedSlots(now, IST);
+  assert.deepEqual(slots, ["2026-11-19T14:15", "2026-11-19T14:30", "2026-11-19T14:45"]);
+  assert.equal(cannotSend(slots, IST, now), false, "8 minutes of lead is enough: no minimum lead time exists");
+  assert.equal(slotProblem("2026-11-19T14:00", IST, now), "This time has passed. Pick a later time.");
+  // The time dropdown lists a time when `${today}T${t}` > now: the first one offered is 14:15, then every quarter.
+  const w = slotWindow(IST, now);
+  const times = ["14:00", "14:15", "14:30", "14:45", "15:00"].filter((t) => `${w.today}T${t}` > w.now);
+  assert.deepEqual(times, ["14:15", "14:30", "14:45", "15:00"]);
 });

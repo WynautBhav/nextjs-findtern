@@ -24,6 +24,7 @@ import { ProposalAvatar } from "@/components/employer/proposal-avatar";
 import { avatarUrl } from "@/lib/employer-pool";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { buttonClass } from "@/components/ui/button";
+import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
 import { offerState } from "@/components/employer/proposal-state";
@@ -219,6 +220,7 @@ export default async function EmployerProposalDetail({
   const flexible = offer.shiftFrom === "flexible" || !offer.shiftFrom;
   const ist = flexible ? null : shiftInIst(offer.shiftFrom, offer.shiftTo, offer.timezone, offer.startDate);
   const ft = offer.fullTime;
+  const rawFt = (raw.fullTimeOffer ?? {}) as Record<string, unknown>;
   // "Free" only for a real zero (fee-only band stores hourly 0); a missing value stays "-".
   const monthlyFree = offer.monthlyMinor === 0 || (offer.monthlyMinor == null && offer.hourlyRateMinor === 0);
 
@@ -257,11 +259,35 @@ export default async function EmployerProposalDetail({
   const hasActions = state.canWithdraw || state.canEdit || proposal.status === "hired";
   const actionsBody = (
     <>
-      {state.canEdit ? (
+      {state.canEdit && ft ? (
+        // A full-time offer is edited in the same form it was sent from (Edit offer on the list lands here with ?edit=1).
+        <FullTimeOfferButton
+          employerId={proposal.employerId}
+          candidate={internName}
+          label="Edit offer"
+          className="w-full justify-center"
+          defaultOpen={edit === "1"}
+          editing={{
+            proposalId: proposal.id,
+            initial: {
+              jobTitle: offer.roleTitle,
+              jobMode: ft.jobMode || "remote",
+              jobLocationCity: String(rawFt.jobLocationCity ?? ""),
+              jobLocationState: String(rawFt.jobLocationState ?? ""),
+              timezone: ft.timezone || "Asia/Kolkata",
+              shiftFrom: ft.shiftFrom || "09:00",
+              shiftTo: ft.shiftTo || "18:00",
+              ctcCurrency: currency,
+              annualCtc: ft.annualCtcMinor ? String(ft.annualCtcMinor / 100) : "",
+              startDate: ft.startDate ?? "",
+            },
+          }}
+        />
+      ) : null}
+      {state.canEdit && !ft ? (
         <ProposalOfferForm
           proposalId={proposal.id}
           defaultOpen={edit === "1"}
-          accepted={proposal.status === "accepted"}
           preference={preference}
           currency={currency}
           place={place}
@@ -297,7 +323,6 @@ export default async function EmployerProposalDetail({
         status={proposal.status}
         canPay={false}
         canWithdraw={state.canWithdraw}
-        {...(confirmingCgpa ? { withdrawLabel: "Withdraw proposal", withdrawSecondary: true } : {})}
       />
       {proposal.status === "hired" && !ft ? (
         <Link href="/employer/timesheets" className={buttonClass({ variant: "outline", block: true })}>

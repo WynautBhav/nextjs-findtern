@@ -23,7 +23,7 @@ export function CgpaNotice({ proposalId, state, canConfirm }: { proposalId: stri
               {gate.correctedFrom && gate.correctedTo ? `CGPA corrected from ${gate.correctedFrom} to ${gate.correctedTo}` : "CGPA corrected"}
             </h2>
             <p className="mt-1 max-w-prose text-pretty text-sm leading-relaxed text-ink-800">
-              Findtern checked the candidate&apos;s CGPA and corrected it. Confirm to continue to payment, or withdraw the proposal.
+              Findtern checked the candidate&apos;s CGPA and corrected it. Confirm to continue to payment.
             </p>
           </div>
         </div>

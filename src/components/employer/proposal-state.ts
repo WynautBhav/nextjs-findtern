@@ -3,6 +3,7 @@ import type { Tone } from "@/components/app/primitives";
 import { cgpaBlocksPayment, type CgpaGate } from "../../lib/cgpa-verification.ts";
 import { offerPastStart, type Offer } from "../../lib/offer.ts";
 import { acceptedUnpaidExpired, EXPIRY_LABEL, type ExpiryReason } from "../../lib/proposal-expiry.ts";
+import { employerMay } from "../../lib/proposal-permissions.ts";
 import { closedReasonOf, proposalBucket, type ClosedReason, type ProposalBucket, type ProposalRow } from "./proposal-bucket.ts";
 
 /**
@@ -18,9 +19,9 @@ export type OfferState = {
   next: string;
   /** Sent, unanswered, and its start date has passed (legacy: expired). */
   lapsed: boolean;
-  /** Edit terms (internship offers, before payment; EMH-30). */
+  /** Edit terms (internship or full-time, until the candidate answers; lib/proposal-permissions.ts). */
   canEdit: boolean;
-  /** Withdraw (unpaid and live). Never an expired offer, stored or lapsed: it is already closed (withdrawRefusal). */
+  /** Withdraw (until the candidate answers). Never an accepted or expired offer: only Findtern withdraws after an answer (lib/proposal-permissions.ts). */
   canWithdraw: boolean;
   /** Accepted, payable now: the CGPA check is clear and the start day has not begun. */
   canPay: boolean;
@@ -69,6 +70,8 @@ export function offerState(p: OfferStateInput, offer: Pick<Offer, "startDate" | 
   const fullTime = Boolean(offer.fullTime);
   const lapsed = (status === "sent" || status === "interview_scheduled") && offerPastStart(offer.startDate, now);
   const unpaid = !p.hiredAt;
+  // The one table (lib/proposal-permissions.ts): the server enforces it, this only reads it.
+  const may = { canEdit: employerMay("edit", { status, hiredAt: p.hiredAt, fullTime }), canWithdraw: employerMay("withdraw", { status, hiredAt: p.hiredAt, fullTime }) };
 
   // Expiry reason: a stored `expired` carries its own; an accepted, unpaid offer whose start day has begun (and has no
   // open order) is expired by computation; a lapsed unanswered one is "no reply".
@@ -120,26 +123,24 @@ export function offerState(p: OfferStateInput, offer: Pick<Offer, "startDate" | 
       next:
         gate.state === "incorrect_unacked"
           ? gate.correctedFrom && gate.correctedTo
-            ? `Findtern corrected the candidate's CGPA from ${gate.correctedFrom} to ${gate.correctedTo}. Confirm to continue to payment, or withdraw the proposal.`
-            : "Findtern corrected the candidate's CGPA. Confirm to continue to payment, or withdraw the proposal."
+            ? `Findtern corrected the candidate's CGPA from ${gate.correctedFrom} to ${gate.correctedTo}. Confirm to continue to payment.`
+            : "Findtern corrected the candidate's CGPA. Confirm to continue to payment."
           : "Accepted. Payment opens once Findtern's final checks are done (usually 24-48 h). We'll let you know when you can pay.",
-      canEdit: !fullTime && unpaid,
-      canWithdraw: unpaid,
+      ...may,
     };
   }
   switch (status) {
     case "draft":
-      return { ...base, label: "Draft", tone: "neutral", next: "Not sent yet.", canEdit: !fullTime, canWithdraw: true };
+      return { ...base, label: "Draft", tone: "neutral", next: "Not sent yet.", ...may };
     case "sent":
       return {
         ...base,
         label: fullTime ? "Full-time offer sent" : "Waiting on candidate",
         tone: "waiting",
         next: fullTime
-          ? "The candidate reads the offer letter and decides. You can withdraw it until they answer."
+          ? "The candidate reads the offer letter and decides. You can edit or withdraw it until they answer."
           : "The candidate reads the offer and decides before the start date. You can still edit or withdraw it.",
-        canEdit: !fullTime,
-        canWithdraw: true,
+        ...may,
       };
     case "interview_scheduled":
       return {
@@ -147,8 +148,7 @@ export function offerState(p: OfferStateInput, offer: Pick<Offer, "startDate" | 
         label: "Interview booked",
         tone: "waiting",
         next: "The candidate answers once the interview has happened. You can still edit or withdraw the offer.",
-        canEdit: !fullTime,
-        canWithdraw: true,
+        ...may,
       };
     case "accepted":
       if (fullTime) {
@@ -158,9 +158,7 @@ export function offerState(p: OfferStateInput, offer: Pick<Offer, "startDate" | 
         ...base,
         label: "Accepted · payment due",
         tone: "paid",
-        next: "Pay for this hire to confirm it. Names and contact details unlock once your hire is paid. Until then you can still edit the offer (the candidate accepts it again) or withdraw it.",
-        canEdit: unpaid,
-        canWithdraw: unpaid,
+        next: "Pay for this hire to confirm it. Names and contact details unlock once your hire is paid.",
         canPay: unpaid,
       };
     case "processing":

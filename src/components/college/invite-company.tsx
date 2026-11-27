@@ -13,7 +13,7 @@ const field =
 
 /**
  * Invite one more company to a running drive: it alone is emailed its own invite. The link stays as it is and nobody
- * inside is let out (Issue a new link does that). `onNote` reports the result in the Link panel's status line.
+ * inside is let out (Replace link does that). `onNote` reports the result in the Link panel's status line.
  */
 export function InviteCompany({ driveId, onNote }: { driveId: string; onNote: (text: string | null, error?: boolean) => void }) {
   const router = useRouter();

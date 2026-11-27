@@ -283,7 +283,7 @@ export default async function SendProposal({
           <p className="mt-2 text-sm leading-relaxed text-ink-700">
             {existing.hired
               ? `${candidate.name} already works with you, so a second internship offer isn't possible. Their placement is on Orders.`
-              : `${candidate.name} already has a live offer from you. One offer per candidate: edit or withdraw that one before sending another.`}
+              : `${candidate.name} already has a live offer from you. One offer per candidate: open that one to see what you can do.`}
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             <Link href={`/employer/proposal/${encodeURIComponent(existing.id)}`} className={buttonClass({ size: "sm" })}>

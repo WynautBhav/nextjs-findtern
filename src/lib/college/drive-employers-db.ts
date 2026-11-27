@@ -20,7 +20,8 @@ export async function loadDriveEmployers(drive: Drive, studentIds: string[], cam
   const db = getDb();
   const p = schema.proposals;
   const end = drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt;
-  const [calls, offers, presence, interviews] = employerIds.length
+  const pm = schema.presenceMinutes;
+  const [calls, offers, presence, interviews, minuteRows, [since]] = employerIds.length
     ? await Promise.all([
         db
           .select({ employerId: schema.collegeDriveMeetings.employerId, status: schema.collegeDriveMeetings.status })
@@ -40,8 +41,15 @@ export async function loadDriveEmployers(drive: Drive, studentIds: string[], cam
               .where(inArray(schema.userPresence.userId, employerIds))
           : Promise.resolve([]),
         loadDriveInterviews(drive, studentIds, employerIds, now),
+        // Online time per company, counted as the drive summary does (minute rows inside the window); a running drive counts to now.
+        db
+          .select({ userId: pm.userId, n: sql<number>`count(*)::int` })
+          .from(pm)
+          .where(and(inArray(pm.userId, employerIds), gte(pm.minute, drive.startsAt), lte(pm.minute, end)))
+          .groupBy(pm.userId),
+        db.select({ first: sql<Date | null>`(min(${pm.minute}) AT TIME ZONE 'UTC')`.mapWith((v: string | Date | null) => (v ? new Date(v) : null)) }).from(pm),
       ])
-    : [[], [], [], []];
+    : [[], [], [], [], [], []];
   const meetings = [...calls, ...interviews];
   return buildDriveEmployers({
     came,
@@ -51,6 +59,8 @@ export async function loadDriveEmployers(drive: Drive, studentIds: string[], cam
       offers.map((o) => ({ employerId: o.employerId, userId: o.userId, status: o.status ?? "", hiredAt: o.hiredAt })),
     ),
     lastSeen: new Map(presence.map((r) => [r.userId, r.lastSeenAt])),
+    // Not recorded at all before the drive ended: "tracked: none" in the summary, shown as a dash.
+    minutes: since?.first && since.first <= end ? new Map(minuteRows.map((r) => [r.userId, r.n])) : null,
     over: !open,
     now,
   });

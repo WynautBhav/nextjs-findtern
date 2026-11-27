@@ -17,6 +17,7 @@ import { employerNoShow } from "@/lib/employer-interview-rules";
 import { HIDDEN_COMPANY, loadInternData, projectNames } from "@/lib/intern-data";
 import type { InterviewRow } from "@/lib/journey";
 import { isInternPaid } from "@/lib/payments";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 /** Rows shown before "Show N more": a long list must not bury the score below it. */
 const SHOWN = 3;
@@ -77,6 +78,7 @@ export default async function InternInterviews() {
 
   return (
     <div className="space-y-6 lg:space-y-8">
+      <LiveRefresh everyMs={30_000} />
       <PageHead title="Interviews" lede="Your Findtern Score and the rounds companies book with you." />
 
       {/* What needs you comes first: the AI interview's own step, then company rounds to pick or join. */}

@@ -5,10 +5,7 @@ import { buttonClass } from "@/components/ui/button";
 import { CopyText } from "./copy-text";
 
 
-/**
- * The drive link, shown once. Only its hash is stored, so if the officer
- * loses it they issue a new one (the old one stops working).
- */
+/** The drive link with its copy, WhatsApp and email actions. Only the officer sees it; the server re-derives it from a stored key. */
 export function ShareLink({
   url,
   collegeName,
@@ -44,7 +41,7 @@ export function ShareLink({
       <div>
         <h3 className="text-[0.9375rem] font-semibold text-ink-900">Your drive link</h3>
         <p className="mt-0.5 text-sm text-ink-700">
-          Copy it now: for security Findtern doesn&apos;t keep a readable copy. Lost it? Issue a new link from the drive page.
+          Anyone with this link can join after signing in. Share it only with companies you invite.
         </p>
       </div>
       <div className="flex flex-col gap-2 sm:flex-row">

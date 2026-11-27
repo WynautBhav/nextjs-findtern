@@ -12,7 +12,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { sendSmtpMail } from "@/lib/mailer";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
-import { startDateProblem } from "@/lib/business-days";
+import { fullTimeTerms, fullTimeTermsProblem, offerLetterKeyProblem } from "@/lib/full-time-offer-terms";
 import { DRIVE_FULL_TIME_FEE } from "@/lib/checkout";
 import { logDriveActivity } from "@/lib/college/campus-lock";
 import { calculateHireFees, ppoRate } from "@/lib/college/drive-pricing";
@@ -34,20 +34,10 @@ const bodySchema = z.object({
   driveId: z.string().min(1).optional(),
   internId: z.string().min(1).optional(),
   projectId: z.string().min(1).optional(),
-  jobTitle: z.string().trim().min(2).max(120),
-  jobMode: z.enum(["remote", "hybrid", "onsite"]),
-  jobLocationCity: z.string().trim().max(80).default(""),
-  jobLocationState: z.string().trim().max(80).default(""),
-  timezone: z.string().min(1).default("Asia/Kolkata"),
-  shiftFrom: z.string().min(1),
-  shiftTo: z.string().min(1),
+  ...fullTimeTerms,
   ctcCurrency: z.enum(["INR", "USD"]),
-  annualCtc: z.number().positive().max(100_000_000),
-  /** USD offers only (Findtern runs their payroll): what an hour above 8 in a day pays, in dollars. */
-  /** Key returned by /api/uploads (kind offer_letter). */
+  /** Key returned by /api/uploads (kind offer_letter, a PDF: offerLetterKeyProblem). */
   offerLetterKey: z.string().min(10),
-  /** Optional joining date. When sent it is held to the hiring start rule (a weekday, two days after sending). Stored inside fullTimeOffer, so it never lapses the offer. */
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a start date.").optional(),
 }).refine((b) => (b.proposalId ? !b.driveId : Boolean(b.driveId && b.internId && b.projectId)), { message: "Invalid input" });
 
 /**
@@ -63,14 +53,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   const b = parsed.data;
-  const dateProblem = b.startDate === undefined ? null : startDateProblem(b.startDate, new Date());
-  if (dateProblem) return NextResponse.json({ error: dateProblem }, { status: 400 });
-  if (b.jobMode !== "remote" && (!b.jobLocationCity || !b.jobLocationState)) {
-    return NextResponse.json({ error: "City and state are needed for onsite or hybrid roles." }, { status: 400 });
-  }
-  if (!b.offerLetterKey.startsWith(id.replace(/[^a-z0-9_-]/gi, "").slice(0, 32))) {
-    return NextResponse.json({ error: "Upload the offer letter again." }, { status: 400 });
-  }
+  const problem = fullTimeTermsProblem(b, new Date()) ?? offerLetterKeyProblem(b.offerLetterKey, id);
+  if (problem) return NextResponse.json({ error: problem }, { status: 400 });
 
   const db = getDb();
   const [employer] = await db.select().from(schema.employers).where(eq(schema.employers.id, id)).limit(1);

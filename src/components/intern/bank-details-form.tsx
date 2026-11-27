@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { DetailRow, Surface } from "@/components/app/primitives";
@@ -55,6 +56,7 @@ const onFile = (b: Stored) => Boolean(b.accountLast4 || b.upiId.trim());
 const ORDER: BankErrorKeys[] = ["bankName", "bankAccountHolderName", "bankAccountNumber", "bankAccountNumberConfirm", "bankIfscCode", "bankUpiId"];
 
 export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) {
+  const router = useRouter();
   const [stored, setStored] = useState<Stored>(() => fromSaved(initialBank));
   const [bank, setBank] = useState<BankValues>(() => toForm(stored));
   const [editing, setEditing] = useState(() => !onFile(fromSaved(initialBank)));
@@ -130,6 +132,7 @@ export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) 
       });
       setSaved(true);
       close();
+      router.refresh(); // earnings and the payout checks read the bank status from the server
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Couldn't save your bank details. Try again.");
     } finally {

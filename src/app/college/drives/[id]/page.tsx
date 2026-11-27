@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -18,6 +19,9 @@ import { LinkActions } from "@/components/college/link-actions";
 import { PresenceLive } from "@/components/college/presence-live";
 import { ButtonLink } from "@/components/ui/button";
 import { driveWindow, readEligibility } from "@/lib/college/access";
+import { shownDriveLink } from "@/lib/college/drive-link";
+import { driveCodeSecret } from "@/lib/drives/code-derive";
+import { tryPublicOrigin } from "@/lib/origin";
 import { degreeOptions, normDegree } from "@/lib/college/eligibility";
 import { closedDriveFinding } from "@/lib/college/drive-board";
 import { loadDriveBoard } from "@/lib/college/drive-board-db";
@@ -31,6 +35,7 @@ import { aiStatusLabel, audienceLabel, DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/
 import { driveForCollegeAdmin, eligibleStudents, presenceSnapshot, requireCollegeContext, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { driveDataOpen, toStudentRow } from "@/lib/college/serialize";
 import { shortDateTime } from "@/lib/format";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +60,9 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   if (!drive) notFound();
 
   const now = requestTime();
+  // The drive link needs an absolute origin; only a dev box without PUBLIC_ORIGIN falls back to the request's host.
+  const h = await headers();
+  const origin = tryPublicOrigin() ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost"}`;
   const w = driveWindow(drive, now);
   const open = driveDataOpen(drive);
   const [students, eligible] = await Promise.all([open ? studentsForCollegeAdmin(ctx) : Promise.resolve([]), eligibleStudents(drive)]);
@@ -94,9 +102,12 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   const rows = students.map(toStudentRow).map((r) => (r.status === "verified" ? r : { ...r, lastSeenAt: null }));
   const e = readEligibility(drive.eligibility);
   const degrees = degreeOptions(rows);
-  // Offers by branch and year: counts only, so they stay on a past drive too (a finished drive is read-only).
+  // Offers by degree and year: counts only, so they stay on a past drive too (a finished drive is read-only).
   const offeredIds = new Set(board.lists.offers.map((s) => s.userId));
   const hiredIds = new Set(board.lists.hired.map((s) => s.userId));
+  // The degree is the student's own (B.Tech, BCA…), the same field as the Degree filter; refs carry the branch only.
+  const spellings = degreeOptions(eligible);
+  const degreeOf = new Map(eligible.map((s) => [s.userId, s.degree?.trim() ? (spellings.find((o) => normDegree(o) === normDegree(s.degree!)) ?? s.degree.trim()) : null]));
   const group = (key: (r: (typeof refs)[number]) => string) => {
     const m = new Map<string, SpreadRow>();
     for (const r of refs) {
@@ -110,7 +121,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
     return [...m.values()];
   };
   const spread = {
-    branches: group((r) => r.branch ?? "Branch not set").sort((a, b) => b.offered - a.offered || b.inDrive - a.inDrive).slice(0, 8),
+    degrees: group((r) => degreeOf.get(r.userId) ?? "Degree not set").sort((a, b) => b.offered - a.offered || b.inDrive - a.inDrive).slice(0, 8),
     years: group((r) => (r.year ? yearLabel(r.year) : "Year not set")).sort((a, b) => a.label.localeCompare(b.label)),
   };
   const calls = board.lists.meetingsWaiting.length;
@@ -183,7 +194,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
           finding={finding}
           initialShow={sp.show}
           timeline={timeline}
-          spread={spread.branches.length ? <DriveSpread branches={spread.branches} years={spread.years} /> : null}
+          spread={spread.degrees.length ? <DriveSpread degrees={spread.degrees} years={spread.years} /> : null}
           activity={<DriveActivityList rows={activity} className="px-5 py-2 sm:px-6" />}
           activityCount={activity.length}
         />
@@ -193,6 +204,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
 
   return (
     <div className="space-y-6">
+      <LiveRefresh everyMs={30_000} />
       <CollegeHero
         title={drive.title}
         lede={lede}
@@ -244,14 +256,14 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
         filter={filter ? { company: filter.company, clearHref: `/college/drives/${drive.id}#board` } : null}
       />
 
-      {spread.branches.length > 0 ? (
+      {spread.degrees.length > 0 ? (
         <Surface className="p-5 sm:p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-base font-semibold text-ink-900">Offers by branch and year</h2>
+            <h2 className="text-base font-semibold text-ink-900">Offers by degree and year</h2>
             <p className="nums text-sm text-text-subtle">{plural(board.lists.offers.length, "student", "students")} offered · {board.lists.hired.length} hired</p>
           </div>
           <div className="mt-4">
-            <DriveSpread branches={spread.branches} years={spread.years} />
+            <DriveSpread degrees={spread.degrees} years={spread.years} />
           </div>
         </Surface>
       ) : null}
@@ -279,6 +291,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
               // Remounted when the hero's Close drive adds ?close=1, so it opens at the confirm step.
               key={sp.close === "1" ? "close" : "link"}
               driveId={drive.id}
+              initialUrl={shownDriveLink(drive, origin, driveCodeSecret(), now)}
               askClose={sp.close === "1" && open}
               collegeName={ctx.college.name}
               driveTitle={drive.title}

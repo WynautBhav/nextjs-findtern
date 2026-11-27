@@ -52,6 +52,12 @@ export function ProjectsManager({
 }) {
   const router = useProgressRouter();
   const [projects, setProjects] = useState<Project[]>(initialProjects);
+  // A fresh server list (a takedown or status change made elsewhere, or our own router.refresh) replaces the local copy.
+  const [seenProjects, setSeenProjects] = useState(initialProjects);
+  if (seenProjects !== initialProjects) {
+    setSeenProjects(initialProjects);
+    setProjects(initialProjects);
+  }
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 

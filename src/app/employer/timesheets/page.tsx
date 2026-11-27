@@ -17,6 +17,7 @@ import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/pri
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { buttonClass } from "@/components/ui/button";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 export const metadata: Metadata = {
   title: "Timesheets",
@@ -132,6 +133,7 @@ export default async function EmployerTimesheets({
 
   return (
     <div>
+      <LiveRefresh everyMs={60_000} />
       <PageHead
         title="Timesheets"
         lede={

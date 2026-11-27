@@ -6,6 +6,7 @@ import { LeaveRequestsTable } from "@/components/college/leave-requests-table";
 import { approvalsFor } from "@/lib/college/approvals";
 import { leaveRequestsForCollege } from "@/lib/college/leave-request-read";
 import { requireCollegeContext } from "@/lib/college/scope";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function ApprovalsPage() {
   const pendingLeaves = leaves.filter((l) => l.status === "requested").length;
   return (
     <div className="space-y-8">
+      <LiveRefresh everyMs={60_000} />
       <div className="space-y-6">
         <CollegeHero
           title="Approvals"

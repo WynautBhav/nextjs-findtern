@@ -157,7 +157,7 @@ export function NotificationList({
                           </time>
                         ) : null}
                       </span>
-                      <span className="mt-1 block text-pretty text-sm leading-relaxed text-ink-600">{n.message}</span>
+                      <span className="mt-1 block whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-600">{n.message}</span>
                     </span>
                   </>
                 );

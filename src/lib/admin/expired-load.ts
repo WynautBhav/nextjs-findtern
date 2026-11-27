@@ -57,7 +57,7 @@ export async function loadExpiredProposals(now: Date): Promise<ExpiredRow[]> {
 export async function linkAuditTimes(): Promise<Map<string, Date>> {
   const a = schema.adminAuditLog;
   const rows = await getDb()
-    .select({ interviewId: sql<string>`${a.meta}->>'interviewId'`, at: sql<Date>`max(${a.createdAt})` })
+    .select({ interviewId: sql<string>`${a.meta}->>'interviewId'`, at: sql<Date>`max(${a.createdAt})`.mapWith(a.createdAt) })
     .from(a)
     .where(eq(a.action, "interview.ai_link_added"))
     .groupBy(sql`${a.meta}->>'interviewId'`);

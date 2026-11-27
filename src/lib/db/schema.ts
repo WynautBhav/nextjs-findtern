@@ -1232,6 +1232,8 @@ export const collegeDrives = pgTable("college_drives", {
   /** Companies the officer invited (0051): the drive page counts who came and lists who to chase. */
   invitedEmployers: jsonb("invited_employers").$type<{ company: string; email: string; name?: string; phone?: string }[]>().notNull().default([]),
   tokenHash: text("token_hash").notNull(),
+  /** Random per-link key (0056): HMAC(server secret, key) is the link token, so the officer can see the link again. Null on older drives. Never sent to the browser. */
+  linkKey: text("link_key"),
   revokedAt: timestamp("revoked_at"),
   /** The paid drive order this drive runs on (drizzle/0018). */
   orderId: varchar("order_id"),

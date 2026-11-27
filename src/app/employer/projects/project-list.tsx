@@ -206,14 +206,14 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
               {p.takenDown && (
                 <div role="note" className="mt-4 rounded-apple-md bg-danger-soft p-3 text-sm text-ink-900">
                   <p className="font-semibold">Taken down by Findtern</p>
-                  <p className="mt-0.5 break-words">{p.takenDownReason || "No reason was recorded."} It is view only until admin restores it. Use Contact admin to resolve this.</p>
+                  <p className="mt-0.5 whitespace-pre-line break-words">{p.takenDownReason || "No reason was recorded."} It is view only until admin restores it. Use Contact admin to resolve this.</p>
                 </div>
               )}
               {meta.key === "pending_review" && <p className="mt-3 text-sm text-text-subtle">Not shown to candidates yet. Publish it now, or move it back to a draft to edit it.</p>}
               {meta.key === "rejected" && (
                 <div role="note" className="mt-4 rounded-apple-md bg-danger-soft p-3 text-sm text-ink-900">
                   <p className="font-semibold">Not approved{p.rejectionReason ? "" : ": no reason was recorded"}</p>
-                  {p.rejectionReason && <p className="mt-0.5 break-words">{p.rejectionReason}</p>}
+                  {p.rejectionReason && <p className="mt-0.5 whitespace-pre-line break-words">{p.rejectionReason}</p>}
                 </div>
               )}
               {(live || hasActions) && (

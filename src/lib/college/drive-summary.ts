@@ -156,7 +156,8 @@ export function buildDriveSummary(input: {
     }
     return { worked: null, outcome: "Not tracked" };
   };
-  const inWindow = nudges.filter((n) => inDrive.has(n.userId) && n.createdAt >= win.start && n.createdAt <= win.end);
+  // The reminder to a booked meet has no tracked outcome (and is not a meet request), so the report leaves it out.
+  const inWindow = nudges.filter((n) => n.kind !== "meeting_reminder" && inDrive.has(n.userId) && n.createdAt >= win.start && n.createdAt <= win.end);
   const rows: NudgeRow[] = inWindow
     .map((n) => ({ userId: n.userId, name: nameOf.get(n.userId) ?? "Student", kind: n.kind as NudgeKind, at: n.createdAt, ...outcomeOf(n) }))
     .sort((a, b) => b.at.getTime() - a.at.getTime());

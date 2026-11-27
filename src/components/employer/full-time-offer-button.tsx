@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BriefcaseBusiness, Loader2 } from "lucide-react";
+import { BriefcaseBusiness, Loader2, Pencil } from "lucide-react";
 
 import { CountdownAgreement } from "@/components/app/countdown-agreement";
 import { FileUpload } from "@/components/app/file-upload";
@@ -30,15 +30,34 @@ const usdNotice = (rate: string) => [
   },
 ];
 
-/** Offer a hired intern (legacy "Full-time offer") or a student in a full-time campus drive a full-time role. */
+/** The terms of a sent full-time offer, as the form holds them (edit mode). */
+export type FullTimeOfferTerms = {
+  jobTitle: string;
+  jobMode: string;
+  jobLocationCity: string;
+  jobLocationState: string;
+  timezone: string;
+  shiftFrom: string;
+  shiftTo: string;
+  ctcCurrency: string;
+  annualCtc: string;
+  startDate: string;
+};
+
+/**
+ * Offer a hired intern (legacy "Full-time offer") or a student in a full-time campus drive a full-time role.
+ * With `editing` it is the same form on an offer already sent: it saves the changed terms (PATCH api/proposals/[id]),
+ * the candidate is told, and the letter is kept unless a new PDF is uploaded.
+ */
 export function FullTimeOfferButton({
   employerId,
   proposalId,
   drive,
   feeRate = null,
   candidate,
-  fteStatus: initialFte,
+  fteStatus: initialFte = "",
   timezone = "Asia/Kolkata",
+  editing,
   className,
   open: openProp,
   onOpenChange,
@@ -54,7 +73,9 @@ export function FullTimeOfferButton({
   /** A conversion: the fee rate the placement was hired on (1% for a campus drive hire), as the server will stamp it. */
   feeRate?: number | null;
   candidate: string;
-  fteStatus: string;
+  fteStatus?: string;
+  /** Edit mode: the sent offer's proposal and its terms. Currency is fixed; the offer letter is optional. */
+  editing?: { proposalId: string; initial: FullTimeOfferTerms };
   /** The company's timezone, from its location. */
   timezone?: string;
   className?: string;
@@ -75,7 +96,13 @@ export function FullTimeOfferButton({
   const [notice, setNotice] = useState(false);
   const [noticeBusy, setNoticeBusy] = useState(false);
   const [fte, setFte] = useState(initialFte);
-  const [v, setV] = useState({
+  // The status the server last sent (an admin decision, the intern's answer) wins over the one from our own POST.
+  const [seenFte, setSeenFte] = useState(initialFte);
+  if (seenFte !== initialFte) {
+    setSeenFte(initialFte);
+    setFte(initialFte);
+  }
+  const [v, setV] = useState(editing?.initial ?? {
     jobTitle: "",
     jobMode: "remote",
     jobLocationCity: "",
@@ -94,13 +121,13 @@ export function FullTimeOfferButton({
   const [error, setError] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | undefined>(undefined);
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setV((s) => ({ ...s, [k]: e.target.value }));
-  const usdBlocked = v.ctcCurrency === "USD" && fte !== "approved";
+  const usdBlocked = !editing && v.ctcCurrency === "USD" && fte !== "approved";
   const ctc = Number(v.annualCtc);
   const usd = v.ctcCurrency === "USD";
   const rate = drive ? DRIVE_FULL_TIME_FEE : (feeRate ?? FULL_TIME_FEE);
   const rateLabel = feeRateLabel(rate);
   const feeMinor = ctc > 0 ? fullTimeFeeMinor(Math.round(ctc * 100), rate) : 0;
-  const idKey = proposalId ?? drive?.internId ?? "new";
+  const idKey = editing?.proposalId ?? proposalId ?? drive?.internId ?? "new";
   const source = drive ? { driveId: drive.driveId, internId: drive.internId, projectId } : { proposalId };
 
   async function requestFte() {
@@ -122,9 +149,10 @@ export function FullTimeOfferButton({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (drive && !projectId) return setError("Pick the project this role belongs to.");
-    if (!letter) return setError("Upload the offer letter (PDF) first.");
+    if (!letter && !editing) return setError("Upload the offer letter (PDF) first.");
     if (v.jobMode !== "remote" && (!v.jobLocationState || !v.jobLocationCity)) return setError("Pick the city and state of the role.");
-    const startIssue = v.startDate ? startDateIssue(v.startDate, new Date()) : null;
+    // A joining date left as it was is not held to today's lead.
+    const startIssue = v.startDate && v.startDate !== editing?.initial.startDate ? startDateIssue(v.startDate, new Date()) : null;
     if (startIssue) {
       setStartError(startIssue);
       return setError(startIssue);
@@ -133,21 +161,29 @@ export function FullTimeOfferButton({
     setError(null);
     setStartError(undefined);
     try {
-      const res = await csrfFetch(`/api/employer/${employerId}/full-time-offer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...v, startDate: v.startDate || undefined, ...source, annualCtc: ctc, offerLetterKey: letter }),
-      });
+      const terms = { ...v, startDate: v.startDate || undefined, annualCtc: ctc };
+      const res = editing
+        ? await csrfFetch(`/api/proposals/${encodeURIComponent(editing.proposalId)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            // The currency is fixed once sent, so it is not part of an edit.
+            body: JSON.stringify({ fullTimeOffer: { ...terms, ctcCurrency: undefined, ...(letter ? { offerLetterKey: letter } : {}) } }),
+          })
+        : await csrfFetch(`/api/employer/${employerId}/full-time-offer`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...terms, ...source, offerLetterKey: letter }),
+          });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         // The server judged the date against its own clock: show its words under the field too.
         if (v.startDate && /start date/i.test(data.error ?? "")) setStartError(data.error);
-        return setError(data.error ?? "Couldn't send the offer.");
+        return setError(data.error ?? (editing ? "Couldn't save the changes." : "Couldn't send the offer."));
       }
       setOpen(false);
       router.refresh();
     } catch {
-      setError("Couldn't send the offer. Check your connection and try again.");
+      setError(`Couldn't ${editing ? "save the changes" : "send the offer"}. Check your connection and try again.`);
     } finally {
       setBusy(false);
     }
@@ -157,16 +193,16 @@ export function FullTimeOfferButton({
     <>
       {controlled ? null : (
         <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant, size: variant === "outline" ? "sm" : undefined, className: cn("min-h-11", className) })}>
-          <BriefcaseBusiness className="size-4" aria-hidden />
+          {editing ? <Pencil className="size-4" aria-hidden /> : <BriefcaseBusiness className="size-4" aria-hidden />}
           {label}
         </button>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Full-time offer for {candidate}</DialogTitle>
+            <DialogTitle>{editing ? "Edit full-time offer" : "Full-time offer"} for {candidate}</DialogTitle>
             <DialogDescription>
-              The hiring fee is {rateLabel} of the annual CTC{drive ? " (campus drive rate)" : ""}, paid at checkout once {candidate} accepts.
+              The hiring fee is {rateLabel} of the annual CTC{drive ? " (campus drive rate)" : ""}, paid at checkout once {candidate} accepts.{editing ? ` ${candidate} is told when you save.` : ""}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
@@ -264,6 +300,7 @@ export function FullTimeOfferButton({
                 Currency
                 <select
                   value={v.ctcCurrency}
+                  disabled={Boolean(editing)}
                   onChange={(e) => {
                     const next = e.target.value;
                     setV((s) => ({ ...s, ctcCurrency: next }));
@@ -307,7 +344,7 @@ export function FullTimeOfferButton({
                 )}
               </p>
             ) : null}
-            <FileUpload kind="offer_letter" accept="application/pdf,image/png,image/jpeg" label="Offer letter" hint="PDF, PNG or JPG, up to 10 MB." onUploaded={(r) => { setLetter(r.key); setError(null); }} />
+            <FileUpload kind="offer_letter" accept="application/pdf" label="Offer letter" noun={editing ? "new offer letter" : undefined} hint={editing ? "The current letter stays unless you upload a new PDF (up to 10 MB)." : "PDF, up to 10 MB."} onUploaded={(r) => { setLetter(r.key); setError(null); }} />
             {error ? (
               <p role="alert" className="text-sm text-danger">
                 {error}
@@ -315,7 +352,7 @@ export function FullTimeOfferButton({
             ) : null}
             <button type="submit" disabled={busy || usdBlocked || (drive ? !drive.projects.length : false)} className={buttonClass({ block: true })}>
               {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-              {busy ? "Sending…" : "Send full-time offer"}
+              {editing ? (busy ? "Saving…" : "Save changes") : busy ? "Sending…" : "Send full-time offer"}
             </button>
           </form>
         </DialogContent>

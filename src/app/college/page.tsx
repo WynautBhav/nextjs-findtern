@@ -15,8 +15,6 @@ import { onYourListCount } from "@/lib/college/count-rules";
 import { eligibleStudents, presenceSnapshot, requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { pendingLeaveCount } from "@/lib/college/leave-request-read";
 import { getDb, schema } from "@/lib/db";
-import { AWAITING_FIRST_PAYMENT } from "@/lib/college/seat-paid";
-import { paidSeatTotal } from "@/lib/college/seat-gate";
 import { Surface } from "@/components/app/primitives";
 import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { ButtonLink } from "@/components/ui/button";
@@ -29,6 +27,7 @@ import { readinessForMany } from "@/lib/college/student-readiness-db";
 import type { HiddenReason } from "@/lib/college/student-readiness";
 import { overviewModes } from "@/lib/college/overview-modes";
 import { AttentionTiles, type AttentionTile } from "@/components/college/attention-tiles";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -58,7 +57,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
 
   // One read of who the officer can accept: the tile counts it and the roster marks those students "Waiting for you" (as Students does).
   const candidates = candidatesFor(ctx.college.id, ctx.college.emailDomains);
-  const [all, coverage, [liveDrive], [seat], paid, hasDriveOrder, pendingLeaves, toAccept, [unpaid], master] = await Promise.all([
+  const [all, coverage, [liveDrive], hasDriveOrder, pendingLeaves, toAccept, [unpaid], master] = await Promise.all([
     studentsForCollegeAdmin(ctx),
     candidates.then((c) => rosterCoverage(ctx.college.id, new Set(c.map((x) => x.email.toLowerCase())))),
     getDb()
@@ -75,12 +74,6 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
       )
       .orderBy(schema.collegeDrives.endsAt)
       .limit(1),
-    getDb()
-      .select({ code: schema.promoCodes.code, used: schema.promoCodes.usedCount, cap: schema.promoCodes.maxUsages })
-      .from(schema.promoCodes)
-      .where(eq(schema.promoCodes.collegeId, ctx.college.id))
-      .limit(1),
-    paidSeatTotal(getDb(), ctx.college.id),
     collegeHasDriveOrder(ctx.college.id),
     pendingLeaveCount(ctx.college.id),
     candidates.then((c) => c.length),
@@ -141,7 +134,8 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
   ];
 
   const nameOf = (s: (typeof students)[number]) => `${s.firstName} ${s.lastName}`.trim() || s.email;
-  const scorePoints = interviewed.flatMap((s) => (s.score !== null && s.cgpa !== null ? [{ userId: s.userId, name: nameOf(s), score: s.score, cgpa: s.cgpa }] : []));
+  // From Master data's rows, so a quadrant tile counts exactly what Master data's view of it lists.
+  const scorePoints = master.flatMap((r) => (r.score !== null && r.cgpa !== null ? [{ userId: r.userId, name: r.name, score: r.score, cgpa: r.cgpa }] : []));
   const topStudents = interviewed
     .filter((s) => s.score !== null)
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.cgpa ?? 0) - (a.cgpa ?? 0))
@@ -152,6 +146,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
 
   return (
     <div className="space-y-6">
+      <LiveRefresh everyMs={60_000} />
       <HeroPanel className="rise">
         <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-5">
           <div className="flex min-w-0 items-center gap-4">
@@ -271,22 +266,6 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
       </Surface>
 
       {hasDriveOrder ? <DriveDashboard /> : null}
-
-      {seat && !hasDriveOrder ? (
-        <section className="rounded-apple-md border border-ink-200 bg-surface p-4" aria-label="Legacy code (read-only)">
-          <p className="text-sm text-ink-600"><strong>Legacy code (read-only).</strong> Existing students keep using it; new drives use roster codes sent to each student.</p>
-          <p className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <code className="select-all break-all font-mono text-xl font-semibold tracking-widest text-ink-900">{seat.code}</code>
-            <span className="nums text-sm font-medium text-ink-800">
-              {seat.used} of {seat.cap ?? "unlimited"} used{seat.cap === null ? "" : ` · ${Math.max(0, seat.cap - seat.used)} left`}
-            </span>
-            <Link href="/college/seats" className="text-sm font-medium underline underline-offset-2 touch:inline-flex touch:min-h-11 touch:items-center">Seats and invoices</Link>
-          </p>
-          {seat.cap !== null && seat.cap - seat.used <= seat.cap * 0.1 ? (
-            <p className="mt-2 text-sm font-medium text-amber-700">{paid.batches === 0 ? AWAITING_FIRST_PAYMENT : "Ask Findtern for more seats."}</p>
-          ) : null}
-        </section>
-      ) : null}
     </div>
   );
 }

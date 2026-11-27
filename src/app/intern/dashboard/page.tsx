@@ -50,6 +50,7 @@ import { membershipOf } from "@/lib/college/membership";
 import { presenceNoticeKey } from "@/lib/dismissed-keys";
 import { paidSeatTotal } from "@/lib/college/seat-gate";
 import { viewFor } from "@/lib/meetings/slots";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 export const metadata: Metadata = {
   title: "Home",
@@ -502,6 +503,7 @@ export default async function InternHome({ searchParams }: { searchParams: Promi
 
   return (
     <div>
+      <LiveRefresh everyMs={60_000} />
       {/* Template: Dashboard (SPECS §5): key numbers, then the bento. */}
       <PageHead
         title={`Hello, ${user?.first ?? "there"}`}

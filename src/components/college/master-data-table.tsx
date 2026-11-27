@@ -8,7 +8,7 @@ import { buttonClass } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { csrfFetch } from "@/lib/client-fetch";
 import { ago } from "@/lib/college/labels";
-import { HIGH_CGPA, STRONG_SCORE, quadrantOf, type Quadrant } from "@/lib/college/insights";
+import { HIGH_CGPA, STRONG_SCORE, inQuadrant, type Quadrant } from "@/lib/college/insights";
 import { COFFEE, MARKS, coffeeOf, marksOf, type CoffeeKey, type MarksKey } from "@/lib/college/overview-modes";
 import { MASTER_COLUMNS, OUTCOMES, cellText, matchesOutcome, matchesWorkMode, type ColumnGroup, type Outcome, type MasterColumn, type MasterRow } from "@/lib/college/master-row";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
@@ -97,7 +97,7 @@ function matches(r: MasterRow, f: Filters, q: string): boolean {
   if (f.placement === "ppo" && !r.ppo) return false;
   if (f.minScore && (r.score === null || r.score < Number(f.minScore))) return false;
   if (f.minCgpa && (r.cgpa === null || r.cgpa < Number(f.minCgpa))) return false;
-  if (f.quadrant && quadrantOf(r) !== f.quadrant) return false;
+  if (f.quadrant && !inQuadrant(r, f.quadrant)) return false;
   if (f.band === "done" && r.score === null) return false;
   if (f.band === "none" && (r.score !== null || !r.verified)) return false; // a claimed student's score is hidden, not absent: never "not interviewed"
   if (f.band && f.band !== "done" && f.band !== "none" && (r.score === null || coffeeOf(r.score) !== f.band)) return false;

@@ -136,8 +136,8 @@ function BookMeetingForm({
       <DialogHeader>
         <DialogTitle>Book a meeting with {candidateLabel}</DialogTitle>
         <DialogDescription>
-          {projectName ? `For ${projectName}. ` : ""}Pick {REQUIRED_SLOTS} time slots the candidate can choose from, on the quarter hour. We suggest the next quarter hour and the
-          two hours after it; change any. The candidate chooses one of them.
+          {projectName ? `For ${projectName}. ` : ""}Pick {REQUIRED_SLOTS} time slots the candidate can choose from, on the quarter hour. We suggest the next three quarter hours;
+          change any. The candidate chooses one of them.
         </DialogDescription>
       </DialogHeader>
 

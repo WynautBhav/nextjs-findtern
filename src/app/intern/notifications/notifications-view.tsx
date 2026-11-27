@@ -3,6 +3,7 @@ import Link from "next/link";
 import { EmptyScene, PageHead, SectionHead } from "@/components/app/primitives";
 import { NotificationList, type NotificationRow } from "@/components/app/notification-list";
 import { cn } from "@/lib/utils";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 /** Props only: `page.tsx` reads the data, this draws it (so a fixture can render it too). */
 export function NotificationsView({
@@ -24,6 +25,7 @@ export function NotificationsView({
 
   return (
     <div>
+      <LiveRefresh everyMs={30_000} />
       <PageHead
         title="Notifications"
         lede={

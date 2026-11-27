@@ -180,7 +180,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
       { label: "View offer", href, icon: <Eye /> },
       ...(state.canEdit ? [{ label: "Edit offer", href: `${href}?edit=1`, icon: <Pencil /> }] : []),
       ...(item.proposal.status === "hired" ? [{ label: "Timesheets", href: "/employer/timesheets", icon: <Clock /> }] : []),
-      ...(state.canWithdraw ? [{ label: state.gate?.state === "incorrect_unacked" ? "Withdraw proposal" : "Withdraw offer", onSelect: () => setWithdrawTarget(item), icon: <X />, destructive: true }] : []),
+      ...(state.canWithdraw ? [{ label: "Withdraw offer", onSelect: () => setWithdrawTarget(item), icon: <X />, destructive: true }] : []),
     ];
   }
 
@@ -482,9 +482,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
           <DialogHeader className="text-left">
             <DialogTitle className="text-lg font-semibold text-ink-900">Withdraw this offer?</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-ink-600">
-              {withdrawTarget?.proposal.status === "accepted"
-                ? "The candidate already accepted. Withdrawing tells them it won't go ahead. This can't be undone."
-                : "The candidate can no longer accept it, and they are told. This can't be undone."}
+              The candidate can no longer accept it, and they are told. This can&apos;t be undone.
             </DialogDescription>
           </DialogHeader>
           {withdrawTarget ? (

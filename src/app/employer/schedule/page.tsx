@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, like, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -66,6 +66,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
   const projectNames = new Map<string, string>();
   const projectZones = new Map<string, string | null>();
   const downProjects = new Map<string, string>(); // taken down by Findtern: view only
+  const lastReminder = new Map<string, number>(); // interview id -> when this employer last nudged the candidate (the intern's in-app row, written by send-reminder)
   let shortlisted = 0;
   try {
     const db = getDb();
@@ -83,7 +84,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
     const projectIds = Array.from(new Set(rows.map((r) => r.projectId).filter(Boolean))) as string[];
     // Wave 2: what depends on the interviews. The shortlist count is only for the empty state: whether anyone is on the
     // shortlist (a candidate already proposed to still is).
-    const [unlocked, users, projects, shortlistRows] = await Promise.all([
+    const [unlocked, users, projects, shortlistRows, reminders] = await Promise.all([
       hiredP,
       internIds.length
         ? db
@@ -103,7 +104,16 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
             .from(schema.employerCartItems)
             .where(and(eq(schema.employerCartItems.employerId, uid), inArray(schema.employerCartItems.listType, ["cart", "checkout"])))
         : Promise.resolve([] as { n: number }[]),
+      // The send-reminder route's in-app row (dedupe key employer_reminder:<id>:<window>) is the record of a manual nudge.
+      rows.length
+        ? db
+            .select({ id: sql<string>`${schema.notifications.data}->>'interviewId'`, at: sql<Date>`max(${schema.notifications.createdAt})`.mapWith(schema.notifications.createdAt) })
+            .from(schema.notifications)
+            .where(and(eq(schema.notifications.recipientType, "intern"), eq(schema.notifications.type, "interview_reminder"), like(schema.notifications.dedupeKey, "employer_reminder:%"), inArray(sql`${schema.notifications.data}->>'interviewId'`, rows.map((r) => r.id))))
+            .groupBy(sql`${schema.notifications.data}->>'interviewId'`)
+        : Promise.resolve([] as { id: string; at: Date }[]),
     ]);
+    for (const m of reminders) lastReminder.set(m.id, new Date(m.at).getTime());
     // A reason stored before the cancel route cleaned it: until the hire is paid, one carrying contact details is hidden whole.
     rows = rows.map((r) => (r.cancelReason && !unlocked.has(r.internId) ? { ...r, cancelReason: scrubContact(r.cancelReason).text } : r));
     if (rows.length === 0) shortlisted = Number(shortlistRows[0]?.n ?? 0);
@@ -151,6 +161,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
       project: iv.projectId ? (projectNames.get(iv.projectId) ?? "Project") : null,
       feedback: feedbackTextOf(iv.notes) || null,
       down: Boolean(iv.projectId && downProjects.has(iv.projectId)),
+      reminderAt: lastReminder.get(iv.id) ?? null,
     };
   });
 

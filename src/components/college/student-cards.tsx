@@ -22,7 +22,7 @@ import { STEPS, stepsReached, stuckAt, type Stuck, type TrackFacts } from "@/lib
 
 /** Which students the page shows: your verified students (with their own filters), or names on your list. */
 export type StudentGroup = "students" | "on_findtern" | "not_joined";
-export type StudentFilter = "all" | "no_interview" | "interviewed" | "offered" | "offers" | "calls" | "hired" | "offline" | "hidden" | "not_open";
+export type StudentFilter = "all" | "no_interview" | "interviewed" | "offered" | "offers" | "calls" | "hired" | "offline" | "hidden";
 type Filter = StudentFilter;
 
 /** "Everyone" is no chip at all: pressing the chip that is on clears it. */
@@ -35,7 +35,6 @@ const FILTERS: { id: Exclude<Filter, "all">; label: string }[] = [
   { id: "calls", label: "Drive meets not answered" },
   { id: "hired", label: "Hired" },
   { id: "hidden", label: "Hidden from employers" },
-  { id: "not_open", label: "Not open to work" },
   { id: "offline", label: "Inactive 7+ days" },
 ];
 
@@ -77,8 +76,6 @@ function matches(s: StudentRow, f: Filter, now: number) {
   if (f === "calls") return s.callsPending > 0;
   if (f === "hired") return s.hired > 0;
   if (f === "hidden") return Boolean(s.hiddenWhy);
-  // Only students for whom Open to work is the one blocker left (owner, 24 Nov): one reason each, as on the dashboard.
-  if (f === "not_open") return s.hidden !== undefined ? s.hidden === "open_to_work" : !s.openToWork;
   if (f === "offline") return !s.lastActivityAt || now - new Date(s.lastActivityAt).getTime() >= WEEK;
   return true;
 }
@@ -244,7 +241,7 @@ export function StudentCards({
         <div className="flex flex-col gap-3 border-b border-ink-100 px-4 py-3 sm:px-5 min-[1380px]:flex-row min-[1380px]:items-center">
           <div className="min-[1380px]:hidden">{yearTrack}</div>
           <div role="group" aria-label="Show only" className={cn(ROW, "min-w-0 flex-1")}>
-            {FILTERS.filter((f) => f.id === "offers" || (f.id === "calls" && filterCounts.calls > 0) || f.id === "hidden" || f.id === "not_open" || f.id === "offline" || f.id === filter).map((f) => {
+            {FILTERS.filter((f) => f.id === "offers" || (f.id === "calls" && filterCounts.calls > 0) || f.id === "hidden" || f.id === "offline" || f.id === filter).map((f) => {
               const on = filter === f.id;
               return (
                 <button key={f.id} type="button" aria-pressed={on} onClick={() => setFilter(on ? "all" : f.id)} className={chipClass(on)}>

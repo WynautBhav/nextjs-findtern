@@ -7,6 +7,9 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { notify } from "@/lib/notify";
+import { fullTimeEdit, fullTimeTermsProblem, offerLetterKeyProblem } from "@/lib/full-time-offer-terms";
+import { proposalActionRefusal } from "@/lib/proposal-permissions";
+import { expiryOf } from "@/lib/proposal-expiry";
 import { learnField } from "@/lib/proposal-copy";
 import { projectZone } from "@/lib/timezones";
 import { hasOpenOrderFor } from "@/lib/payments";
@@ -58,19 +61,16 @@ const offerSchema = z
   })
   .strict();
 
-/** Accepted counts until the employer pays (then it is hired). An offer
- *  waiting on its interview can be edited too (legacy; EMH-30). */
-const EDITABLE = ["draft", "sent", "interview_scheduled", "accepted"];
-
-const bodySchema = z.object({ offer: offerSchema }).refine((b) => Object.keys(b.offer).length > 0, {
-  message: "Nothing to update",
-});
+/** An internship offer's terms (`offer`) or a full-time offer's (`fullTimeOffer`), never both. */
+const bodySchema = z
+  .object({ offer: offerSchema.optional(), fullTimeOffer: fullTimeEdit.optional() })
+  .refine((b) => (b.offer ? 1 : 0) + (b.fullTimeOffer ? 1 : 0) === 1 && Object.keys(b.offer ?? b.fullTimeOffer ?? {}).length > 0, { message: "Nothing to update" });
 
 /**
- * Edit a live offer's terms: draft, sent, or accepted but not yet paid for
- * (bug sheet 23 Oct). Editing an accepted offer sends it back to the intern
- * to accept again - they agreed to the old terms, not the new ones. Once it
- * is rejected, paid (hired), withdrawn or expired the terms are history.
+ * Edit a live offer's terms. Who may, and in which state, is proposal-permissions.ts (the one table): the employer while
+ * the offer is unanswered (draft, sent, interview booked), an internship or a full-time offer alike; once the candidate
+ * accepts, only Findtern (27 Nov). Editing an accepted offer (admin) sends it back to the intern to accept again - they
+ * agreed to the old terms, not the new ones. Rejected, paid (hired), withdrawn or expired: the terms are history.
  */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const guard = await requireMutation({ req, roles: ["employer", "admin"] });
@@ -99,12 +99,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (session.role !== "admin" && proposal.employerId !== session.uid) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (!EDITABLE.includes(proposal.status) || proposal.hiredAt) {
-    return NextResponse.json(
-      { error: `A ${proposal.status} proposal can no longer be edited` },
-      { status: 409 },
-    );
-  }
+  const current = (proposal.offerDetails ?? {}) as Record<string, unknown>;
+  const before = parseOffer(current, proposal.currency);
+  const refusal = proposalActionRefusal("edit", session.role === "admin" ? "admin" : "employer", {
+    status: proposal.status,
+    hiredAt: proposal.hiredAt,
+    fullTime: Boolean(before.fullTime),
+    expired: expiryOf(proposal).expired,
+  });
+  if (refusal) return NextResponse.json({ error: refusal }, { status: 409 });
 
   if (proposal.status === "accepted" && (await hasOpenOrderFor(proposal.employerId, proposal.id))) {
     return NextResponse.json({ error: "A payment for this offer is in progress. Try again in a few minutes." }, { status: 409 });
@@ -122,14 +125,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (blocked) return NextResponse.json({ error: blocked, code: "listing_taken_down" }, { status: 409 });
   }
 
-  const current = (proposal.offerDetails ?? {}) as Record<string, unknown>;
-  const before = parseOffer(current, proposal.currency);
-  // A full-time offer is a signed letter, not editable terms (legacy UI).
-  if (before.fullTime) {
-    return NextResponse.json({ error: "A full-time offer can't be edited. Withdraw it and send a new one." }, { status: 409 });
+  if (Boolean(before.fullTime) !== Boolean(parsed.data.fullTimeOffer)) {
+    return NextResponse.json({ error: before.fullTime ? "This is a full-time offer. Edit its full-time terms." : "This is an internship offer." }, { status: 400 });
   }
+  if (parsed.data.fullTimeOffer) return editFullTime({ proposal, current, edits: parsed.data.fullTimeOffer, employerId: proposal.employerId });
 
-  const { message, ...edits } = parsed.data.offer;
+  const { message, ...edits } = parsed.data.offer!;
   // The offer's zone is the project's (feedback sheet 2, row 7): an edit cannot move it elsewhere.
   if (edits.timezone !== undefined && proposal.projectId) {
     const [pz] = await db
@@ -304,20 +305,56 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "This offer changed a moment ago. Refresh and try again." }, { status: 409 });
   }
 
-  // Tell the intern to look again (legacy routes.ts:14392). A draft is not
-  // visible to them yet, so there is nothing to re-review.
-  if (proposal.status === "sent" || proposal.status === "interview_scheduled" || reopen) {
-    await notify({
-      to: { type: "intern", id: proposal.internId },
-      type: "proposal_updated",
-      title: reopen ? "Offer changed - accept again" : "Proposal updated",
-      message: reopen
-        ? "The company changed the offer you accepted. Review the new terms and accept again."
-        : "The proposal has been updated, please review.",
-      data: { proposalId: id, employerId: proposal.employerId, projectId: proposal.projectId },
-      dedupeKey: `proposal_updated:${id}:${updated.updatedAt?.getTime() ?? Date.now()}`,
-    });
-  }
+  await tellInternToReview(proposal, updated.updatedAt, reopen);
 
   return NextResponse.json({ ok: true, updatedAt: updated?.updatedAt ?? null });
+}
+
+type ProposalRow = typeof schema.proposals.$inferSelect;
+
+/** Tell the intern to look again (legacy routes.ts:14392). A draft is not visible to them yet, so there is nothing to re-review. */
+async function tellInternToReview(proposal: ProposalRow, updatedAt: Date | null, reopen: boolean) {
+  if (!(proposal.status === "sent" || proposal.status === "interview_scheduled" || reopen)) return;
+  await notify({
+    to: { type: "intern", id: proposal.internId },
+    type: "proposal_updated",
+    title: reopen ? "Offer changed - accept again" : "Proposal updated",
+    message: reopen
+      ? "The company changed the offer you accepted. Review the new terms and accept again."
+      : "The proposal has been updated, please review.",
+    data: { proposalId: proposal.id, employerId: proposal.employerId, projectId: proposal.projectId },
+    dedupeKey: `proposal_updated:${proposal.id}:${updatedAt?.getTime() ?? Date.now()}`,
+  });
+}
+
+/**
+ * A full-time offer's terms: the same fields the send form has (full-time-offer-terms.ts), judged the same way, on the
+ * stored `fullTimeOffer`. What is left out stays. The fee rate, drive and base placement are server-stamped and never read from the body.
+ * Only reached once proposalActionRefusal has let the edit through (unanswered offers).
+ */
+async function editFullTime({ proposal, current, edits, employerId }: { proposal: ProposalRow; current: Record<string, unknown>; edits: z.infer<typeof fullTimeEdit>; employerId: string }) {
+  const { offerLetterKey, ...terms } = edits;
+  const was = (current.fullTimeOffer ?? {}) as Record<string, unknown>;
+  const mode = terms.jobMode ?? String(was.jobMode ?? "remote");
+  const remote = mode === "remote";
+  const city = remote ? "" : (terms.jobLocationCity ?? String(was.jobLocationCity ?? ""));
+  const state = remote ? "" : (terms.jobLocationState ?? String(was.jobLocationState ?? ""));
+  // A joining date left as it was is not held to today's lead (it was valid when sent).
+  const problem =
+    fullTimeTermsProblem({ jobMode: mode, jobLocationCity: city, jobLocationState: state, startDate: terms.startDate }, new Date(), terms.startDate !== was.startDate) ??
+    (offerLetterKey === undefined ? null : offerLetterKeyProblem(offerLetterKey, employerId));
+  if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+
+  const ft: Record<string, unknown> = { ...was, ...terms, ...(offerLetterKey ? { offerLetterKey } : {}), jobMode: mode, jobLocationCity: city, jobLocationState: state, updatedAt: new Date().toISOString() };
+  // A stored minor-unit figure (older rows) would outrank the edited CTC when the offer is read.
+  if (terms.annualCtc !== undefined) delete ft.annualCtcMinor;
+  const [row] = await getDb()
+    .update(schema.proposals)
+    .set({ offerDetails: { ...current, fullTimeOffer: ft }, updatedAt: new Date() })
+    // Unchanged since it was read, so an acceptance in between is never overwritten.
+    .where(and(eq(schema.proposals.id, proposal.id), eq(schema.proposals.status, proposal.status)))
+    .returning({ updatedAt: schema.proposals.updatedAt });
+  if (!row) return NextResponse.json({ error: "This offer changed a moment ago. Refresh and try again." }, { status: 409 });
+  await tellInternToReview(proposal, row.updatedAt, false);
+  return NextResponse.json({ ok: true, updatedAt: row.updatedAt });
 }

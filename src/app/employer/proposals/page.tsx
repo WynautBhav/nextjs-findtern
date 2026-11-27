@@ -21,6 +21,7 @@ import { ProposalTabs } from "@/components/employer/section-tabs";
 import { hireFlowCountsFor, internExtraForRequest, openOrdersForRequest, stateForRow } from "@/lib/employer-flow";
 import { ProposalsManager, type ProposalItem } from "@/components/employer/proposals-manager";
 import { perfScope } from "@/lib/perf/timing";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 export const metadata: Metadata = {
   title: "Proposals",
@@ -121,6 +122,7 @@ async function EmployerProposalsPageImpl() {
 
   return (
     <div>
+      <LiveRefresh everyMs={30_000} />
       <PageHead
         title="Proposals"
         action={

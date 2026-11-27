@@ -120,7 +120,7 @@ export const cgpaEmployerEmails = {
     preheader: `Findtern corrected the CGPA of ${o.candidate} for ${o.role}. Confirm to continue to payment.`,
     heading: "A CGPA was corrected, confirm to continue",
     greeting: hi(""),
-    lines: [`Findtern checked the CGPA of ${o.candidate} for ${o.role} against the marksheets and corrected it.`, "Review the corrected score and confirm to continue to payment, or withdraw the proposal."],
+    lines: [`Findtern checked the CGPA of ${o.candidate} for ${o.role} against the marksheets and corrected it.`, "Review the corrected score and confirm to continue to payment."],
     status: "Needs your confirmation",
     tone: "alert",
     cta: cta("Review the proposal", `/employer/proposal/${o.proposalId}`),

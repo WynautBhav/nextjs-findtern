@@ -139,7 +139,7 @@ export function CgpaRows({ rows, now, canWrite }: { rows: CgpaQueueRow[]; now: D
             {decided ? (
               <p className="text-sm text-text-subtle">
                 {r.status === "verified" ? "Verified" : "Marked incorrect"} {when(r.decidedAt)}
-                {r.note ? <span className="block break-words text-foreground">Note: {r.note}</span> : null}
+                {r.note ? <span className="block whitespace-pre-line break-words text-foreground">Note: {r.note}</span> : null}
               </p>
             ) : canWrite ? (
               <CgpaDecision target={{ internId: r.internId, name: r.name, semester: r.semester, claimedScore: r.claimedScore, scoreType: r.scoreType }} />

@@ -4,6 +4,7 @@ import { SURFACE_CLASS } from "@/components/app/primitives";
 import { employerHref, employersLine, type DriveEmployers, type EmployerRow } from "@/lib/college/drive-employers";
 import { shortDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { duration } from "./drive-summary";
 
 const when = (d: Date) => shortDateTime(d, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 const n = (v: number) => v.toLocaleString("en-IN");
@@ -93,20 +94,22 @@ export function DriveEmployersPanel({ driveId, data, over }: { driveId: string; 
                 </div>
                 <Reach r={r} />
                 <p className="nums mt-1 text-xs text-text-subtle">
-                  {r.employerId ? `${n(r.meetings)} ${r.meetings === 1 ? "meeting" : "meetings"} · ${n(r.offers)} ${r.offers === 1 ? "offer" : "offers"} · ${n(r.hires)} ${r.hires === 1 ? "hire" : "hires"}` : "Invited"}
+                  {r.employerId ? `${r.minutes === null ? "" : `${duration(r.minutes)} online · `}${n(r.shortlisted)} shortlisted · ${n(r.meetings)} ${r.meetings === 1 ? "meeting" : "meetings"} · ${n(r.offers)} ${r.offers === 1 ? "offer" : "offers"} · ${n(r.hires)} ${r.hires === 1 ? "hire" : "hires"}` : "Invited"}
                 </p>
               </li>
             ))}
           </ul>
 
           <div className="hidden overflow-x-auto sm:block">
-            <table className="w-full min-w-[44rem] text-sm">
+            <table className="w-full min-w-[54rem] text-sm">
               <thead className={headless ? "sr-only" : undefined}>
                 <tr className="text-left text-xs text-text-subtle">
                   <th scope="col" className="px-5 py-2.5 font-medium">Company</th>
                   <th scope="col" className="px-3 py-2.5 font-medium">Status</th>
                   <th scope="col" className="px-3 py-2.5 font-medium">Invited</th>
                   <th scope="col" className="px-3 py-2.5 font-medium">Joined</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">Online</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">Shortlisted</th>
                   <th scope="col" className="px-3 py-2.5 text-right font-medium">Meetings</th>
                   <th scope="col" className="px-3 py-2.5 text-right font-medium">Offers</th>
                   <th scope="col" className="px-5 py-2.5 text-right font-medium">Hires</th>
@@ -122,6 +125,8 @@ export function DriveEmployersPanel({ driveId, data, over }: { driveId: string; 
                     <td className="px-3 py-3"><Status s={r.status} /></td>
                     <td className={cn("px-3 py-3", r.invited ? "text-ink-700" : "text-text-subtle")}>{r.invited ? "Yes" : "No"}</td>
                     <td className="nums px-3 py-3 text-ink-700">{r.joinedAt ? when(r.joinedAt) : "—"}</td>
+                    <td className="nums px-3 py-3 text-right text-ink-700">{r.employerId && r.minutes !== null ? duration(r.minutes) : "—"}</td>
+                    <td className="nums px-3 py-3 text-right">{figure(r, r.shortlisted)}</td>
                     <td className="nums px-3 py-3 text-right">{figure(r, r.meetings)}</td>
                     <td className="nums px-3 py-3 text-right">{figure(r, r.offers)}</td>
                     <td className={cn("nums px-5 py-3 text-right", r.hires && "font-semibold")}>{figure(r, r.hires)}</td>

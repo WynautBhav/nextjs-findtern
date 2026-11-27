@@ -17,6 +17,11 @@ export const HIDDEN_REASONS: { id: HiddenReason; label: string }[] = [
   { id: "paused", label: "Paused by Findtern" },
 ];
 
+/** Students page links. The old "Not open to work" chip was the same list as Hidden, Open to work turned off: its links land there. */
+export function studentsLinkFilter(show: string | undefined, why: string | undefined): { show: string | undefined; why: string | undefined } {
+  return show === "not_open" ? { show: "hidden", why: "open_to_work" } : { show, why };
+}
+
 export const COHORTS = [
   { year: 2, label: "2nd year", goal: "Internship" },
   { year: 3, label: "3rd year", goal: "Internship + PPO" },

@@ -25,6 +25,7 @@ import type { ProposalRow } from "@/lib/journey";
 import { guaranteeEnded as isGuaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
 import { FREE_DECLINES } from "@/lib/offer";
 import { TAKEDOWN_BLOCKS } from "@/lib/projects/takedown";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 export const metadata: Metadata = {
   title: "Offers",
@@ -94,6 +95,7 @@ export default async function InternProposals({ searchParams }: { searchParams: 
 
   return (
     <div>
+      <LiveRefresh everyMs={30_000} />
       <PageHead
         title="Your offers"
         lede={

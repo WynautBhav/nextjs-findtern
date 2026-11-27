@@ -13,13 +13,13 @@ import { getInvoiceSeller } from "@/lib/invoice-seller";
 
 export const dynamic = "force-dynamic";
 
-/** The college's code, seats used / cap / left, and its seat batches with invoices. */
+/** Seats used against the seats paid for, and the college's seat batches with invoices. The shared code is retired and no longer shown. */
 export default async function SeatsPage() {
   const ctx = await requireCollegeContext();
   const db = getDb();
   const [[seat], batches, hasDriveOrder] = await Promise.all([
     db
-      .select({ code: schema.promoCodes.code, used: schema.promoCodes.usedCount, cap: schema.promoCodes.maxUsages })
+      .select({ used: schema.promoCodes.usedCount, cap: schema.promoCodes.maxUsages })
       .from(schema.promoCodes)
       .where(eq(schema.promoCodes.collegeId, ctx.college.id))
       .limit(1),
@@ -33,32 +33,19 @@ export default async function SeatsPage() {
   const paid = visible.filter((b) => b.status === "paid");
   const pending = visible.filter((b) => b.status === "pending");
   const seatsPaid = paid.reduce((n, b) => n + b.seats, 0);
-  const showCode = Boolean(seat && !hasDriveOrder);
+  const showGauge = Boolean(seat && !hasDriveOrder);
   return (
     <div className="space-y-6">
       <CollegeHero title="Seats" lede="Each seat waives one student's AI interview fee.">
         <div className="mt-8 grid gap-x-12 gap-y-8 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-end">
-          {showCode && seat && seat.cap !== null ? <ArcGauge used={seat.used} total={seat.cap} label="seats used" /> : null}
+          {showGauge && seat && seat.cap !== null ? <ArcGauge used={seat.used} total={seat.cap} label="seats used" /> : null}
           <HeroStats cols={3} className="mt-0">
-            <HeroStat lead={!showCode} label="Seats paid for" value={seatsPaid.toLocaleString("en-IN")} hint={`${paid.length} paid ${paid.length === 1 ? "batch" : "batches"}`} />
+            <HeroStat lead={!showGauge} label="Seats paid for" value={seatsPaid.toLocaleString("en-IN")} hint={`${paid.length} paid ${paid.length === 1 ? "batch" : "batches"}`} />
             <HeroStat label="Paid to Findtern" value={money(paid.reduce((n, b) => n + b.amountMinor, 0))} hint="GST included" />
             <HeroStat label="Awaiting payment" value={pending.length ? money(pending.reduce((n, b) => n + b.amountMinor, 0)) : "—"} hint={pending.length ? `${pending.reduce((n, b) => n + b.seats, 0)} seats on hold` : "Nothing due"} />
           </HeroStats>
         </div>
       </CollegeHero>
-
-      {showCode && seat ? (
-        <Surface className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div className="min-w-0">
-            <p className="text-sm text-text-subtle">Legacy code (read-only). Existing students keep using it.</p>
-            <code className="mt-1 block select-all font-mono text-2xl font-semibold tracking-[0.14em] text-ink-900">{seat.code}</code>
-          </div>
-          <p className="nums text-sm text-ink-700">
-            <span className="font-semibold text-ink-900">{seat.used}</span> used · <span className="font-semibold text-ink-900">{seat.cap ?? "unlimited"}</span> total ·{" "}
-            <span className="font-semibold text-ink-900">{seat.cap === null ? "unlimited" : Math.max(0, seat.cap - seat.used)}</span> left
-          </p>
-        </Surface>
-      ) : null}
 
       {visible.length === 0 ? (
         <Surface>

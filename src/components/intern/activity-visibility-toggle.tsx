@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { Switch } from "@/components/ui/switch";
@@ -13,6 +14,7 @@ import { csrfFetch } from "@/lib/client-fetch";
  * directions wait, so "off" never reads as hidden before it is. A failed save leaves the true state and the error.
  */
 export function ActivityVisibilityToggle({ initial }: { initial: boolean }) {
+  const router = useRouter();
   const [on, setOn] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -39,6 +41,7 @@ export function ActivityVisibilityToggle({ initial }: { initial: boolean }) {
         return;
       }
       setOn(next);
+      router.refresh(); // other screens read this setting from the server
       setSaved(next ? "Employers can see when you're active." : "Employers can no longer see when you're active.");
     } catch {
       setError("Could not save. Try again.");

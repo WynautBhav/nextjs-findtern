@@ -7,7 +7,7 @@ import { Phone, PhoneOff, Radio, Video, X } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
-import { HEARTBEAT_MS } from "@/lib/college/constants";
+import { CALL_GRACE_MS, HEARTBEAT_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./college-push";
 import { useDismissed } from "@/hooks/use-dismissed";
@@ -106,7 +106,8 @@ export function CollegeLive({ collegeName, vapidKey, initialDrive = null }: { co
   const [bannerGone, closeBanner] = useDismissed("session", driveId ? driveBannerKey(driveId) : null);
   // The College page keeps its full card (call alerts live there), never dismissed.
   const showBanner = !!drive && (full || (!bannerGone && onDriveRoute));
-  const visible = meetings.filter((m) => !dismissed.has(m.id));
+  // A request lapses CALL_GRACE_MS after its start (meetings.ts effectiveStatus): drop it between heartbeats, not only at the next one.
+  const visible = meetings.filter((m) => !dismissed.has(m.id) && !(m.status === "requested" && new Date(m.startsAt).getTime() + CALL_GRACE_MS < now));
   const current = visible[0] ?? null;
 
   return (

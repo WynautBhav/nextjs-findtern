@@ -92,7 +92,7 @@ export async function loadDriveBoard(
       ? db
           .select({ userId: n.userId, kind: n.kind, createdAt: utc(n.createdAt) })
           .from(n)
-          .where(and(eq(n.collegeId, drive.collegeId), inArray(n.userId, ids), inArray(n.kind, ["online", "open_to_work", "meeting", "offer"]), gte(n.createdAt, drive.startsAt), lte(n.createdAt, end)))
+          .where(and(eq(n.collegeId, drive.collegeId), inArray(n.userId, ids), inArray(n.kind, ["online", "open_to_work", "meeting", "meeting_reminder", "offer"]), gte(n.createdAt, drive.startsAt), lte(n.createdAt, end)))
       : Promise.resolve([] as NudgeRow[]),
     // Who the drive's companies shortlisted (bug sheet 26 Nov: the drive page shows it).
     db

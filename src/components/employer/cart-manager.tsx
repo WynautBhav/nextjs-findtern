@@ -79,6 +79,12 @@ export function CartManager({
   const router = useRouter();
   const nameOf = (line: CartLineItem) => displayNameOf(line.candidate, unlockAll);
   const [cartLines, setCartLines] = useState<CartLineItem[]>(initialCartLines);
+  // A fresh server list (router.refresh after a proposal or meeting) replaces the local copy; optimistic removals stay until then.
+  const [seenCartLines, setSeenCartLines] = useState(initialCartLines);
+  if (seenCartLines !== initialCartLines) {
+    setSeenCartLines(initialCartLines);
+    setCartLines(initialCartLines);
+  }
   const [selectedProject, setSelectedProject] = useState<string>("all");
 
   const [meetingCandidate, setMeetingCandidate] = useState<CartLineItem | null>(null);

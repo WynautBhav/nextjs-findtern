@@ -64,6 +64,8 @@ export type EmployerRow = {
   hires: number;
   /** Students this company shortlisted in the drive (bug sheet 26 Nov). */
   shortlisted: number;
+  /** Minutes the company was online inside the drive window; null when online time was not recorded for it yet (or it never came). */
+  minutes: number | null;
 };
 
 export type DriveEmployers = {
@@ -80,6 +82,8 @@ export function buildDriveEmployers(input: {
   counts: Map<string, EmployerCounts>;
   /** employerId -> last heartbeat. */
   lastSeen: Map<string, Date>;
+  /** employerId -> minutes online in the drive; null when online time was not recorded yet. */
+  minutes?: Map<string, number> | null;
   over: boolean;
   now?: number;
 }): DriveEmployers {
@@ -108,12 +112,13 @@ export function buildDriveEmployers(input: {
       joinedAt: c.joinedAt,
       status,
       shortlisted: c.shortlisted ?? 0,
+      minutes: input.minutes ? (input.minutes.get(c.employerId) ?? 0) : null,
       ...(input.counts.get(c.employerId) ?? none),
     };
   });
   const { missing } = matchInvites(input.invited, input.came);
   for (const [i, m] of missing.entries()) {
-    rows.push({ key: `missing-${i}-${m.email}`, employerId: null, company: m.company, contact: null, phone: null, email: m.email, invited: true, joinedAt: null, status: { kind: "absent" }, shortlisted: 0, ...none });
+    rows.push({ key: `missing-${i}-${m.email}`, employerId: null, company: m.company, contact: null, phone: null, email: m.email, invited: true, joinedAt: null, status: { kind: "absent" }, shortlisted: 0, minutes: null, ...none });
   }
   return { rows, inDrive: input.came.length, online, invitedMissing: missing.length };
 }

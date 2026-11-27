@@ -69,17 +69,20 @@ const LIVE: Group[] = [
       ALL_STUDENTS,
       { key: "online", label: "Online now", hint: (n) => (n ? "On Findtern right now" : "Nobody is online"), ofTotal: true, needsPresence: true },
       { key: "aiPending", label: "AI interview not done", hint: (n) => (n ? "Employers can't see them yet" : "Everyone has done it"), nudge: "interview", critical: true, ofTotal: true },
+      { key: "shortlisted", label: "Shortlisted", figure: (b) => b.shortlistCount, hint: (n) => (n ? "By at least one company" : "Nobody shortlisted yet") },
     ],
   },
   MEETINGS,
   {
-    title: "What this drive has produced",
+    // Owner, 27 Nov: sent, accepted, rejected, withdrawn, hired (internship), hired (full-time). Offers counted one by one (drive-board.ts offerCounts).
+    title: "Offers",
     tiles: [
-      { key: "shortlisted", label: "Shortlisted", figure: (b) => b.shortlistCount, hint: (n) => (n ? "By at least one company" : "Nobody shortlisted yet") },
-      { key: "offers", label: "Offers received", figure: (b) => b.offerCount, hint: (n, b) => (b.offerCount ? `to ${n} ${n === 1 ? "student" : "students"}` : "No offer yet") },
-      { key: "offersWithdrawn", label: "Offers withdrawn", figure: (b) => b.withdrawnCount, hint: (n) => (n ? "The company took the offer back" : "None withdrawn") },
-      { key: "internships", label: "Placed: internship", hint: (n) => (n ? "Hired for an internship" : "No hire yet") },
-      { key: "fullTime", label: "Placed: full-time", hint: (n) => (n ? "Hired for a full-time role" : "No hire yet") },
+      { key: "offers", label: "Offers sent", figure: (b) => b.offerCounts.sent, hint: (n) => ofStudents(n, "No offer yet") },
+      { key: "offersAccepted", label: "Accepted", figure: (b) => b.offerCounts.accepted, hint: (n) => ofStudents(n, "None accepted") },
+      { key: "offersRejected", label: "Rejected", figure: (b) => b.offerCounts.rejected, hint: (n) => ofStudents(n, "None rejected") },
+      { key: "offersWithdrawn", label: "Withdrawn", figure: (b) => b.offerCounts.withdrawn, hint: (n) => (n ? `${ofStudents(n, "")} · taken back by the company` : "None withdrawn") },
+      { key: "internships", label: "Hired: internship", figure: (b) => b.offerCounts.hiredInternship, hint: (n) => ofStudents(n, "No hire yet") },
+      { key: "fullTime", label: "Hired: full-time", figure: (b) => b.offerCounts.hiredFullTime, hint: (n) => ofStudents(n, "No hire yet") },
     ],
   },
   { title: "Nudges sent", tiles: NUDGES },
@@ -119,6 +122,7 @@ const PAGE = 40;
 const GRID = {
   2: "grid grid-cols-2 divide-x divide-ink-100 border-b border-ink-100",
   3: "grid grid-cols-3 divide-x divide-ink-100 border-b border-ink-100",
+  6: "grid grid-cols-2 divide-ink-100 border-b border-ink-100 max-sm:[&>*:nth-child(n+3)]:border-t max-sm:[&>*:nth-child(even)]:border-l sm:grid-cols-3 sm:[&>*:nth-child(n+4)]:border-t sm:[&>*:not(:nth-child(3n+1))]:border-l",
   4: "grid grid-cols-2 divide-ink-100 border-b border-ink-100 max-sm:[&>*:nth-child(n+3)]:border-t max-sm:[&>*:nth-child(even)]:border-l sm:grid-cols-4 sm:divide-x",
 } as const;
 
@@ -202,7 +206,7 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
       ) : null}
       {groups.map((g) => (
         <TileGroup key={g.title} title={g.title}>
-          <div className={g.tiles.length === 2 ? GRID[2] : g.tiles.length === 3 ? GRID[3] : GRID[4]}>{g.tiles.map(button)}</div>
+          <div className={g.tiles.length === 2 ? GRID[2] : g.tiles.length === 3 ? GRID[3] : g.tiles.length === 6 ? GRID[6] : GRID[4]}>{g.tiles.map(button)}</div>
         </TileGroup>
       ))}
 
@@ -234,7 +238,7 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
       ) : (
         <ul className="divide-y divide-ink-100 border-t border-ink-100">
           {shown.map((r) => (
-            <Row key={r.userId} r={r} nudge={canNudge && r.again !== false ? tile.nudge : undefined} />
+            <Row key={r.userId} r={r} nudge={open ? (r.meetNudge ?? (canNudge && r.again !== false ? tile.nudge : undefined)) : undefined} />
           ))}
         </ul>
       )}
@@ -262,7 +266,7 @@ function TileGroup({ title, children }: { title: string; children: ReactNode }) 
 }
 
 /** One student in a list: name and roll line, what happened, phone. Shared with the past-drive pop-ups. */
-export function Row({ r, nudge }: { r: BoardItem; nudge?: NudgeHistoryKind | "interview" }) {
+export function Row({ r, nudge }: { r: BoardItem; nudge?: NudgeHistoryKind | "interview" | "meeting_reminder" }) {
   const meta = [r.year ? yearLabel(r.year) : null, r.branch].filter(Boolean).join(" · ");
   return (
     <li className="grid gap-x-6 gap-y-1.5 px-5 py-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto_auto] sm:items-center">
@@ -281,7 +285,7 @@ export function Row({ r, nudge }: { r: BoardItem; nudge?: NudgeHistoryKind | "in
       ) : (
         <span className="text-sm text-ink-400">No phone</span>
       )}
-      <span className="sm:justify-self-end">{nudge ? <NudgeButton kind={nudge} userIds={[r.userId]} label="Nudge" size="xs" /> : null}</span>
+      <span className="sm:justify-self-end">{nudge ? <NudgeButton kind={nudge} userIds={[r.userId]} label={nudge === "meeting_reminder" ? "Remind" : "Nudge"} size="xs" /> : null}</span>
     </li>
   );
 }

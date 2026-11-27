@@ -147,6 +147,8 @@ test("the edit route measures a changed start from the edit time", () => {
 
 test("the full-time route refuses a start date that breaks the rule, with the shared copy", () => {
   const src = read("api/employer/[id]/full-time-offer/route.ts");
-  assert.match(src, /startDateProblem\(b\.startDate, new Date\(\)\)/);
+  // The send route and the edit branch share one rule (full-time-offer-terms.ts), which holds the date to startDateProblem.
+  assert.match(src, /fullTimeTermsProblem\(b, new Date\(\)\)/);
   assert.match(src, /status: 400/);
+  assert.match(readFileSync(join(import.meta.dirname, "full-time-offer-terms.ts"), "utf8"), /startDateProblem\(t\.startDate, now\)/);
 });

@@ -72,7 +72,7 @@ const diff = (drive, what, got, want) => {
 };
 const summary = [];
 
-const TILES = { meetingsWaiting: "Drive meets not answered", offersWaiting: "Offers not answered", offers: "Offers received", meetings: "Meets accepted", internships: "Placed: internship", fullTime: "Placed: full-time" };
+const TILES = { meetingsWaiting: "Drive meets not answered", offersWaiting: "Offers not answered", offers: "Offers sent", meetings: "Meets accepted", internships: "Hired: internship", fullTime: "Hired: full-time" };
 for (const drive of drives) {
   await page.goto(`${BASE}/college/drives/${drive.id}`, { waitUntil: "load" });
   await page.waitForSelector("h1");

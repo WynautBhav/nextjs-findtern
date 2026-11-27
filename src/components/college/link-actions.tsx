@@ -9,9 +9,11 @@ import { buttonClass } from "@/components/ui/button";
 import { InviteCompany } from "./invite-company";
 import { ShareLink } from "./share-link";
 
-/** Issue a fresh link (old one dies) or close the drive to every employer at once. */
+/** The current link, Invite a company, Replace link (for a leaked one: the old one dies) and Close drive. */
 export function LinkActions(props: {
   driveId: string;
+  /** The current link, from the server while the drive is open; null for a drive made before links could be shown again. */
+  initialUrl?: string | null;
   /** Open straight at the Close drive confirm (the hero's Close drive button). */
   askClose?: boolean;
   collegeName: string;
@@ -21,7 +23,13 @@ export function LinkActions(props: {
   kind: string;
 }) {
   const router = useRouter();
-  const [url, setUrl] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(props.initialUrl ?? null);
+  // The link the server last sent (another officer replaced it, the drive closed) wins over the one from our own call.
+  const [seenUrl, setSeenUrl] = useState(props.initialUrl ?? null);
+  if (seenUrl !== (props.initialUrl ?? null)) {
+    setSeenUrl(props.initialUrl ?? null);
+    setUrl(props.initialUrl ?? null);
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -59,16 +67,16 @@ export function LinkActions(props: {
   const consequence =
     asking === "DELETE"
       ? "The drive ends now and can't be reopened. Every employer, including those already inside, loses access immediately."
-      : "The current link stops working, and companies already inside are let out too. Companies you invited are emailed a fresh invite; send the new link to any others you still want. Shortlists are kept.";
+      : "The old link stops working and companies already inside are let out. Invited companies are emailed the new link; send it to any others. Shortlists are kept. To add a company, use Invite a company instead.";
 
   return (
     <div ref={box} className="space-y-4">
       {url ? (
         <ShareLink url={url} {...props} />
       ) : (
-        // Only a fingerprint of the link is stored, so it can't be shown again.
+        // Drives made before the link could be re-derived: only a fingerprint of it is stored.
         <p className="text-sm text-ink-600">
-          The link was shown once, when it was made, and can&apos;t be shown again. If you&apos;ve lost it, issue a new one.
+          This drive&apos;s link was shown once, when it was made, and can&apos;t be shown again. To add a company, invite it below. If the link was lost or leaked, replace it.
         </p>
       )}
       {asking ? (
@@ -91,7 +99,7 @@ export function LinkActions(props: {
               onClick={() => void call(asking)}
               className={buttonClass({ variant: asking === "DELETE" ? "dark" : "primary", size: "sm" })}
             >
-              {asking === "DELETE" ? "Yes, close the drive" : "Yes, issue a new link"}
+              {asking === "DELETE" ? "Yes, close the drive" : "Yes, replace the link"}
             </button>
             {/* Cancel takes the focus: Enter on a focused "close" can't be undone. */}
             <button type="button" autoFocus onClick={cancel} className={buttonClass({ variant: "outline", size: "sm" })}>
@@ -116,7 +124,7 @@ export function LinkActions(props: {
             onClick={() => setAsking("POST")}
             className={buttonClass({ variant: "outline", size: "sm" })}
           >
-            Issue a new link
+            Replace link
           </button>
           <button
             type="button"

@@ -168,6 +168,21 @@ describe("cancel and reschedule", () => {
     assert.equal((canCancel(booked, at(10).getTime()) as { code: string }).code, "started");
     assert.equal((canCancel({ ...booked, status: "completed" }, NOW) as { code: string }).code, "not_open");
   });
+  it("a lapsed offer (respond-by or every slot passed, not yet swept to expired) cannot be cancelled, by either side, on the screen or the route", () => {
+    const lapsedByRespond: MeetingState = { status: "pending", proposedBy: "employer", round: 1, slot1: at(10), slot2: at(11), slot3: at(12), respondBy: at(8) };
+    const lapsedBySlots: MeetingState = { status: "pending", proposedBy: "employer", round: 1, slot1: at(-3), slot2: at(-2), slot3: at(-1), respondBy: null };
+    for (const s of [lapsedByRespond, lapsedBySlots]) {
+      const now = s === lapsedByRespond ? at(9).getTime() : NOW;
+      assert.equal((canCancel(s, now) as { code: string }).code, "lapsed");
+      for (const role of ["employer", "intern"] as const) {
+        assert.equal(viewFor(s, role, now).canCancel, false, role);
+        assert.equal((step(s, { type: "cancel", by: role }, now) as { code: string }).code, "lapsed", role);
+      }
+    }
+    // Still answerable, and a reschedule request nobody has answered, stay cancellable.
+    assert.equal(canCancel(lapsedByRespond, NOW).ok, true);
+    assert.equal(canCancel({ status: "pending", proposedBy: "intern", slot1: null, slot2: null, slot3: null }, NOW).ok, true);
+  });
   it("the employer reschedules a booked meeting with three new times (round + 1, proposer employer); the intern cannot", () => {
     const f = must(step(booked, { type: "reschedule", by: "employer", slots: [at(50), at(51), at(52)] }, NOW)).fields;
     assert.equal(f.status, "pending");

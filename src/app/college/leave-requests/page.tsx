@@ -2,6 +2,7 @@ import { PageHead } from "@/components/app/primitives";
 import { LeaveRequestsTable } from "@/components/college/leave-requests-table";
 import { leaveRequestsForCollege } from "@/lib/college/leave-request-read";
 import { requireCollegeContext } from "@/lib/college/scope";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function LeaveRequestsPage() {
   const rows = await leaveRequestsForCollege(ctx.college.id);
   return (
     <div className="space-y-6">
+      <LiveRefresh everyMs={60_000} />
       <PageHead
         title="Leave requests"
         lede="A student can only leave your college once you approve. Approving removes them from your dashboard and drives straight away. Rejecting keeps them; they can ask again."

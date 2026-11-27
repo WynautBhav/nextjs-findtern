@@ -1,17 +1,18 @@
 import { CollegeHero, HeroStat, HeroStats, ScoreDots } from "@/components/college/kit";
 import { StudentCards, type StudentFilter, type StudentGroup } from "@/components/college/student-cards";
 import { ButtonLink } from "@/components/ui/button";
-import { aiStatusLabel } from "@/lib/college/labels";
+import { aiStatusLabel, studentsLinkFilter } from "@/lib/college/labels";
 import { approvalsFor } from "@/lib/college/approvals";
 import { requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { requirePublicOrigin } from "@/lib/origin";
 import { toStudentRow } from "@/lib/college/serialize";
 import { HIDDEN_REASONS } from "@/lib/college/labels";
 import { readinessForMany } from "@/lib/college/student-readiness-db";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 export const dynamic = "force-dynamic";
 
-const FILTERS: readonly StudentFilter[] = ["all", "no_interview", "interviewed", "offered", "offers", "calls", "hired", "offline", "hidden", "not_open"];
+const FILTERS: readonly StudentFilter[] = ["all", "no_interview", "interviewed", "offered", "offers", "calls", "hired", "offline", "hidden"];
 const GROUPS: readonly StudentGroup[] = ["students", "on_findtern", "not_joined"];
 
 /** Request time, for "online"/"x min ago" labels. Dynamic page, so this is per request. */
@@ -26,7 +27,8 @@ function requestTime(): number {
  */
 export default async function StudentsPage({ searchParams }: { searchParams?: Promise<{ show?: string; why?: string }> }) {
   const ctx = await requireCollegeContext();
-  const { show, why } = (await searchParams) ?? {};
+  const sp = (await searchParams) ?? {};
+  const { show, why } = studentsLinkFilter(sp.show, sp.why);
   const [all, { candidates }] = await Promise.all([studentsForCollegeAdmin(ctx), approvalsFor(ctx.college.id, ctx.college.emailDomains)]);
   const students = all.filter((s) => s.status === "verified");
   const [coverage, readiness] = await Promise.all([
@@ -54,6 +56,7 @@ export default async function StudentsPage({ searchParams }: { searchParams?: Pr
   const offers = interviewed.filter((s) => s.score !== null && s.score >= 6 && s.proposals > 0).length;
   return (
     <div className="space-y-6">
+      <LiveRefresh everyMs={60_000} />
       <CollegeHero
         title="Students"
         lede="Your verified students, as employers in your campus drives can find them. Only you see names and contact details."

@@ -18,6 +18,7 @@ import { emptyScheduleCopy } from "@/components/employer/schedule-empty";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
 import type { schema } from "@/lib/db";
+import { LiveRefresh } from "@/components/app/live-refresh";
 
 /** Each stage, as the employer reads it. */
 export const STAGE: Record<InterviewStage, { label: string; tone: Tone }> = {
@@ -81,6 +82,7 @@ export function ScheduleView({
   const openWith = new Set([...new Set(all.map((x) => x.iv.internId))].filter((id) => hasOpenMeeting(all.filter((x) => x.iv.internId === id).map((x) => x.iv))));
   return (
     <div>
+      <LiveRefresh everyMs={30_000} />
       <PageHead
         title="Schedule"
         lede={all.length === 0 ? "Meetings you book with candidates land here, with what to do about each one." : "Time slots show in each meeting's own time zone. The join link works from here."}
@@ -221,6 +223,8 @@ export type Row = {
   feedback: string | null;
   /** The interview's project is taken down by Findtern: no action on it. */
   down: boolean;
+  /** When this company last sent the candidate a reminder (email and in-app); null when it never did. */
+  reminderAt: number | null;
 };
 
 export const dayKey = (t: number, tz: string) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(t);
@@ -300,6 +304,11 @@ function ScheduleRow({ r, now, past, employerId, meetingOpen }: { r: Row; now: n
               </>
             ) : null}
           </p>
+          {r.reminderAt !== null && (stage === "upcoming" || waiting) ? (
+            <p className="nums mt-1 text-sm text-ink-600">
+              Reminder sent {formatSlotDay(new Date(r.reminderAt), r.tz)} {clockOf(r.reminderAt, r.tz).time}
+            </p>
+          ) : null}
           {lapsedOffer ? <p className="mt-1 text-sm text-ink-600">Nobody picked a time before the offer ran out. Offer 3 new time slots.</p> : null}
           {cancelled ? (
             <p className="mt-1 text-sm text-ink-600">

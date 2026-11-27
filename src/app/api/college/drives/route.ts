@@ -9,7 +9,7 @@ import { sendAndRecordInvites } from "@/lib/college/drive-invite-send";
 import { getDb, schema } from "@/lib/db";
 import { blockedInvites } from "@/lib/college/drive-overlap";
 
-/** Create a drive. The link's token is returned once and never stored. */
+/** Create a drive. The link comes back here and is re-derived for the officer from the stored key (never stored itself). */
 export async function POST(req: Request) {
   const g = await requireCollegeMutation(req, "drive:create");
   if (!g.ok) return g.response;
@@ -24,13 +24,13 @@ export async function POST(req: Request) {
   // One drive at a time: no invited company may already be in an overlapping drive (owner, 24 Nov).
   const [blocked] = await blockedInvites(getDb(), { collegeId: g.ctx.college.id, driveId: null, w: parsed.data, emails: (parsed.data.invitedEmployers ?? []).map((i) => i.email) });
   if (blocked) return NextResponse.json({ error: blocked.error, field: "invitedEmployers" }, { status: 409 });
-  const { token, hash } = generateDriveToken();
+  const { token, hash, key } = generateDriveToken();
   // Every invited company is unsent until its mail goes out (recorded below), so a held-back one is retried on a later save.
   const list = prepareInvited(parsed.data.invitedEmployers ?? [], null);
   const toSend = invitesToSend([], list);
   const [drive] = await getDb()
     .insert(schema.collegeDrives)
-    .values({ ...parsed.data, invitedEmployers: withUnsent(list, toSend.map((i) => i.email)), collegeId: g.ctx.college.id, tokenHash: hash, createdBy: g.ctx.admin.id })
+    .values({ ...parsed.data, invitedEmployers: withUnsent(list, toSend.map((i) => i.email)), collegeId: g.ctx.college.id, tokenHash: hash, linkKey: key, createdBy: g.ctx.admin.id })
     .returning({ id: schema.collegeDrives.id });
   // After the commit: each invited company is emailed (and alerted in its app if it has an account).
   const { title, startsAt, endsAt } = parsed.data;

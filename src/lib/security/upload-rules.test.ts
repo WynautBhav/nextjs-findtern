@@ -155,7 +155,20 @@ test("support: the intern role loses PDF (images and video stay), the employer k
   }
 });
 
-test("employer offer letters still accept PDF, and a stored PDF is kept as sent", async () => {
+test("the offer letter is a PDF and nothing else: images are refused by type, an image sent as a PDF by its bytes", async () => {
+  for (const t of ["image/jpeg", "image/png", "image/webp"]) {
+    const r = checkType(KINDS.offer_letter, t, "employer");
+    assert.equal(r?.status, 415, t);
+    assert.match(r?.error ?? "", /PDF/);
+  }
+  for (const img of [await jpeg(), await png()]) {
+    const r = await prepareUpload("offer_letter", KINDS.offer_letter, "application/pdf", img, "offer.pdf");
+    assert.equal(r.ok, false);
+    assert.ok(!r.ok && r.status === 415 && /not a PDF/.test(r.error));
+  }
+});
+
+test("employer offer letters accept PDF, and a stored PDF is kept as sent", async () => {
   assert.equal(checkType(KINDS.offer_letter, "application/pdf", "employer"), null);
   const r = await prepareUpload("offer_letter", KINDS.offer_letter, "application/pdf", PDF, "offer.pdf");
   assert.ok(r.ok);
@@ -231,7 +244,6 @@ test("logos, CMS images and shared-kind images become WebP too", async () => {
     ["employer_logo", "image/png", await png()],
     ["cms_image", "image/jpeg", await jpeg()],
     ["support", "image/png", await png()],
-    ["offer_letter", "image/jpeg", await jpeg()],
   ] as const) {
     const r = await prepareUpload(name, KINDS[name], type, input, "pic.png");
     assert.ok(r.ok, name);
@@ -263,7 +275,7 @@ test("a logo that fails conversion is kept as sent; every other image kind, ID d
   assert.deepEqual(kept.bytes, garbagePng);
   assert.equal(kept.contentType, "image/png");
   assert.equal(kept.fileName, "logo.png");
-  for (const name of ["aadhaar", "pan", "profile_photo", "marksheet", "certificate", "cms_image", "support", "offer_letter"]) {
+  for (const name of ["aadhaar", "pan", "profile_photo", "marksheet", "certificate", "cms_image", "support"]) {
     const r = await prepareUpload(name, KINDS[name], "image/png", garbagePng, "x.png");
     assert.equal(r.ok, false, name);
     assert.ok(!r.ok);

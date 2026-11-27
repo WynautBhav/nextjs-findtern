@@ -14,7 +14,8 @@ import { driveDataOpen } from "@/lib/college/serialize";
 import { getDb, schema } from "@/lib/db";
 
 /**
- * POST: issue a fresh link for a running drive (the old one stops working). A closed or ended drive is final and is
+ * POST: issue a fresh link for a running drive (the old one stops working), to replace a leaked one. To add a company
+ * without touching the link or letting anyone out, use the invites route. A closed or ended drive is final and is
  * refused: it is never reopened (owner, 24 Nov). Employers already inside are let out too and come back
  * through the new link, so a leaked link can really be rotated (QA-200).
  * Emailed invites are signed over the old token hash, so they die with it: every
@@ -28,8 +29,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const drive = await driveForCollegeAdmin(g.ctx, (await ctx.params).id);
   if (!drive) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (!driveDataOpen(drive)) return NextResponse.json({ error: "This drive has ended and can't be reopened." }, { status: 409 });
-  const { token, hash } = generateDriveToken();
-  await reissueDriveLink(getDb(), drive.id, hash);
+  const { token, hash, key } = generateDriveToken();
+  await reissueDriveLink(getDb(), drive.id, hash, key);
   const { id, title, kind, startsAt, endsAt } = drive;
   const list = drive.invitedEmployers ?? [];
   const invites = await sendAndRecordInvites({ id, title, kind, startsAt, endsAt, tokenHash: hash }, g.ctx.college.id, g.ctx.college.name, list, invitesToSend([], list), { resend: true });
@@ -45,7 +46,8 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
   await getDb().transaction(async (tx) => {
     await tx
       .update(schema.collegeDrives)
-      .set({ revokedAt: new Date(), updatedAt: new Date() })
+      // The link can no longer be shown: drop its key too.
+      .set({ revokedAt: new Date(), linkKey: null, updatedAt: new Date() })
       .where(eq(schema.collegeDrives.id, drive.id));
     await closeDriveCalls(tx, drive.id);
   });

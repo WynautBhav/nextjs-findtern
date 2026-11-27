@@ -16,6 +16,7 @@ import { humanizeStatus, proposalStatus } from "@/components/app/status";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { interviewLifecycle } from "@/lib/interview-lifecycle";
 import { effectiveStatus } from "@/lib/college/meetings";
+import { meetNudgeKind, type MeetNudgeKind } from "@/lib/college/drive-board";
 import { cgpaText } from "@/lib/college/master-row";
 import { aiStatusLabel, cohortGoal, membershipLabel, yearLabel, ago } from "@/lib/college/labels";
 import { auditCollegeView, requireCollegeContext, studentForCollegeAdmin } from "@/lib/college/scope";
@@ -48,6 +49,19 @@ const AXES = [
   ["aptitude", "Aptitude"],
   ["interview", "Interview"],
 ] as const;
+
+/** A meet's state pill, and the nudge it calls for: an unanswered request to answer, a booked meet to turn up to. */
+function MeetStatus({ pill, nudge, userId }: { pill: string; nudge: MeetNudgeKind | null; userId: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Pill tone="neutral">{pill}</Pill>
+      {nudge ? <NudgeButton kind={nudge} userIds={[userId]} label={nudge === "meeting" ? "Nudge to reply" : "Remind"} size="xs" /> : null}
+    </div>
+  );
+}
+
+/** An interview invite waiting on the student's pick is a request; a picked slot still ahead is a booked meet (as drive-interviews-db reads it). */
+const interviewNudge = (state: string): MeetNudgeKind | null => (state === "awaiting_pick" ? "meeting" : state === "upcoming" || state === "live" ? "meeting_reminder" : null);
 
 /** Request time, for the online dot. Dynamic page, so this is per request. */
 function requestTime(): number {
@@ -391,7 +405,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                       {shortDateTime(m.startsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} IST
                     </p>
                   </div>
-                  <Pill tone="neutral">{humanizeStatus(effectiveStatus(m, requestTime()))}</Pill>
+                  <MeetStatus pill={humanizeStatus(effectiveStatus(m, requestTime()))} nudge={meetNudgeKind(m, requestTime())} userId={id} />
                 </li>
               ))}
               {interviews.map(({ i }) => (
@@ -407,7 +421,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                       </p>
                     ) : null}
                   </div>
-                  <Pill tone="neutral">{interviewLifecycle(i).label === "Waiting on candidate" ? humanizeStatus(i.status) : interviewLifecycle(i).label}</Pill>
+                  <MeetStatus pill={interviewLifecycle(i).label === "Waiting on candidate" ? humanizeStatus(i.status) : interviewLifecycle(i).label} nudge={interviewNudge(interviewLifecycle(i).state)} userId={id} />
                 </li>
               ))}
             </ul>
@@ -422,7 +436,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                 <li key={n} className="px-5 py-3.5">
                   <p className="font-medium text-ink-900">{[e.role, e.company].filter(Boolean).join(" at ") || "Experience"}</p>
                   <p className="text-sm text-text-subtle">{e.from} – {e.to}</p>
-                  {e.description ? <p className="mt-1 line-clamp-3 text-sm text-ink-700">{e.description}</p> : null}
+                  {e.description ? <p className="mt-1 line-clamp-3 whitespace-pre-line text-sm text-ink-700">{e.description}</p> : null}
                 </li>
               ))}
             </ul>

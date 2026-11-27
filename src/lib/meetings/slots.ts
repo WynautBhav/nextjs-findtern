@@ -110,10 +110,10 @@ export function canChoose(s: MeetingState, role: Role, now: number = Date.now())
   return { ok: true };
 }
 
-/** Cancel while the meeting is still ahead: an open offer, or a booked one that has not started. */
+/** Cancel while the meeting is still ahead: an open offer that has not lapsed, or a booked one that has not started. A lapsed offer reads expired, so it is not cancellable. */
 export function canCancel(s: MeetingState, now: number = Date.now()): { ok: true } | Refusal {
   const status = (s.status ?? "").toLowerCase();
-  if (status === "pending") return { ok: true };
+  if (status === "pending") return isLapsed(s, now) ? refuse("lapsed", "This offer has expired. The company can offer new time slots.") : { ok: true };
   if (status === "scheduled") {
     const start = bookedStart(s) ?? offered(s)[0] ?? null;
     return start !== null && start <= now ? refuse("started", "This meeting has started. Mark it completed or missed instead.") : { ok: true };

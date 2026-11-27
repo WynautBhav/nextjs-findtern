@@ -4,7 +4,7 @@ import type { getDb } from "../db/index.ts";
 import { collegeDriveEmployers, collegeDrives } from "../db/schema.ts";
 
 /**
- * Issue a new link for a drive, in one transaction: the new token hash, the
+ * Issue a new link for a drive (the replacement for a leaked one; adding a company is the invites route), in one transaction: the new token hash, the
  * drive reopened if it was revoked, and every employer's joined row deleted
  * (QA-200).
  *
@@ -23,10 +23,11 @@ export async function reissueDriveLink(
   db: Pick<ReturnType<typeof getDb>, "transaction">,
   driveId: string,
   tokenHash: string,
+  linkKey: string | null = null,
   now: Date = new Date(),
 ): Promise<void> {
   await db.transaction(async (tx) => {
-    await tx.update(collegeDrives).set({ tokenHash, updatedAt: now }).where(eq(collegeDrives.id, driveId));
+    await tx.update(collegeDrives).set({ tokenHash, linkKey, updatedAt: now }).where(eq(collegeDrives.id, driveId));
     // A company that left the drive (Exit campus drive) keeps its row: a new link, a resent invite or an auto-join at
     // sign-in must not put it back under the lock and the drive pricing.
     await tx.delete(collegeDriveEmployers).where(and(eq(collegeDriveEmployers.driveId, driveId), ne(collegeDriveEmployers.status, "exited")));

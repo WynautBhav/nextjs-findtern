@@ -67,8 +67,8 @@ const LABEL = "mb-1.5 block text-sm font-medium text-ink-800";
 /**
  * Offer editor on the proposal page: the composer's fields minus identity
  * (project and candidate never change) and currency (the company's country
- * sets it). Internship offers before payment only; saving an accepted one
- * sends it back to the candidate to accept again. Hours and the monthly
+ * sets it). Internship offers until the candidate answers (an accepted offer is no longer the employer's to
+ * edit, 27 Nov; see lib/proposal-permissions.ts). Hours and the monthly
  * figure follow the working week and paid leave; the server does the same
  * sum and re-checks every rule here.
  */
@@ -78,7 +78,6 @@ export function ProposalOfferForm({
   currency,
   shortOnly = false,
   defaultOpen = false,
-  accepted = false,
   hasLaptop = null,
   preference = { modes: [], cities: [] },
   place = null,
@@ -90,8 +89,6 @@ export function ProposalOfferForm({
   proposalId: string;
   /** A campus drive offer keeps its % off the monthly charge through edits (stamped when sent). */
   driveDiscountPercent?: number;
-  /** The candidate already accepted: saving asks them to accept again. */
-  accepted?: boolean;
   /** The candidate said they have no laptop: the company must provide one (EMH-18). */
   hasLaptop?: boolean | null;
   /** Where the candidate can work; mode and city follow it. */
@@ -239,11 +236,7 @@ export function ProposalOfferForm({
 
   return (
     <div className="space-y-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
-      <p className="text-sm leading-relaxed text-ink-600">
-        {accepted
-          ? "The candidate accepted the current terms. Saving sends the changed offer back to them to accept again before you can pay."
-          : "The candidate is told the offer changed and asked to review it again."}
-      </p>
+      <p className="text-sm leading-relaxed text-ink-600">The candidate is told the offer changed and asked to review it again.</p>
       <label className="block">
         <span className={LABEL}>Role title</span>
         <input {...fieldProps("title")} value={roleTitle} onChange={(e) => setRoleTitle(e.target.value)} className={INPUT} />

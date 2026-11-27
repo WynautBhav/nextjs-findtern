@@ -138,14 +138,12 @@ export function PresenceLive({
               <span key={o.userId} title={o.name} className={cn(dot, "bg-ink-200")} />
             ))}
           </div>
-          {snap.offline.length > 0 ? (
+          {/* With no phone alerts on there is nothing to say (owner, 27 Nov: the "none of the offline students" line is gone). */}
+          {snap.offline.length > 0 && snap.alertable > 0 ? (
             <p className="mt-3 text-sm text-ink-700">
-              {/* Said plainly; it read "0 more can get a phone alert; 35 only see…". */}
-              {snap.alertable === 0
-                ? "None of the offline students has phone alerts on, so a nudge reaches them when they next open Findtern."
-                : snap.alertable === snap.offline.length
-                  ? "Every offline student has phone alerts on: a nudge reaches their phone now."
-                  : `${snap.alertable} offline students get a nudge on their phone now; the rest when they next open Findtern.`}
+              {snap.alertable === snap.offline.length
+                ? "Every offline student has phone alerts on: a nudge reaches their phone now."
+                : `${snap.alertable} offline students get a nudge on their phone now; the rest when they next open Findtern.`}
             </p>
           ) : null}
         </div>
