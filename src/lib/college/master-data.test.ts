@@ -19,7 +19,7 @@ const extras = (over: Partial<MasterExtras> = {}): MasterExtras => ({
     aadhaarNumber: "1234 5678 9012", panNumber: "ABCDE1234F", bank: { accountNumber: "000111" },
   },
   skills: ["Excel", "Sales"], locationTypes: ["Hybrid", "remote", "space"], preferredLocations: ["Jaipur", "Delhi"],
-  hasLaptop: true, city: "Jaipur", state: "Rajasthan", experience: [{}], offers: 0, offersAccepted: 0, offersRejected: 0, offersLapsed: 0, offersOpen: 0, hired: 0, ppo: 0, earningsMinor: 0, meetings: { total: 0, done: 0, missed: 0, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, notClosed: 0, notJoined: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 }, ...over,
+  hasLaptop: true, city: "Jaipur", state: "Rajasthan", experience: [{}], offers: 0, offersAccepted: 0, offersRejected: 0, offersLapsed: 0, offersOpen: 0, hired: 0, ppo: 0, internship: 0, ppoDirect: 0, ppoAfter: 0, earningsMinor: 0, meetings: { total: 0, done: 0, missed: 0, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, notClosed: 0, notJoined: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 }, ...over,
 });
 
 test("a verified student carries every field on the master data list", () => {

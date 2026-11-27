@@ -11,7 +11,7 @@ const row = (over: Partial<MasterRow>): MasterRow => ({
   startYear: null, endYear: null, year: 3, semester: null, linkedin: null, city: null, cgpa: null, professionalCourse: null,
   professionalStatus: null, professionalLevel: null, certifications: null, experience: null, workMode: null, preferredLocations: [],
   laptop: null, lastSeenAt: null, skills: [], hasReport: false, hasRecording: false, english: null, coding: null, aptitude: null,
-  aiInterview: null, score: null, offers: 0, offersAccepted: 0, offersRejected: 0, offersLapsed: 0, offersOpen: 0, marks10: null, hired: false, ppo: false,
+  aiInterview: null, score: null, offers: 0, offersAccepted: 0, offersRejected: 0, offersLapsed: 0, offersOpen: 0, marks10: null, hired: false, ppo: false, internship: false, ppoDirect: false, ppoAfter: false,
   earningsMinor: 0, meetings: { total: 0, done: 0, missed: 0, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, notClosed: 0, notJoined: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 }, openToWork: true, ...over,
 });
 
@@ -41,8 +41,23 @@ test("every part adds up to its whole, and unverified students are left out", ()
   assert.equal(o.received, 4);
   assert.equal(o.accepted + o.rejected + o.notAnswered + o.withdrawn, o.received);
   assert.equal(o.withdrawn, 1);
-  assert.deepEqual([placement.withOffer, placement.internships, placement.ppo], [2, 1, 1]);
+  assert.deepEqual([placement.withOffer, placement.ppo], [2, 1]);
   assert.equal(placement.coffee.find((b) => b.key === "latte")?.hired, 1);
+});
+
+// Owner, 27 Nov: after Accepted the flow splits in two, Internship and Direct PPO (a full-time offer with no internship
+// first), and Internship leads on to PPO after internship. A direct PPO that got hired is not an internship.
+test("accepted offers split into internships and direct PPOs; PPOs after an internship flow from internships", () => {
+  const p = overviewModes([
+    row({ score: 7, offers: 2, offersAccepted: 2, hired: true, ppo: true, internship: true, ppoAfter: true }),
+    row({ score: 7, offers: 1, offersAccepted: 1, hired: true, ppo: true, ppoDirect: true }),
+    row({ score: 7, offers: 1, offersAccepted: 1, hired: true, internship: true }),
+    row({ score: 7, offers: 1, offersOpen: 1, ppo: true }),
+  ]).placement;
+  assert.deepEqual([p.internships, p.ppoDirect, p.ppoAfter], [2, 1, 1]);
+  const a = row({ ppoDirect: true }), b = row({ internship: true, ppoAfter: true });
+  const pick = (k: Parameters<typeof matchesOutcome>[1]) => [a, b].filter((r) => matchesOutcome(r, k)).map((r) => r.userId);
+  assert.deepEqual([pick("internship"), pick("ppo-direct"), pick("ppo-after")], [[b.userId], [a.userId], [b.userId]]);
 });
 
 test("meetings: every part adds up to the total, unverified students are left out", () => {

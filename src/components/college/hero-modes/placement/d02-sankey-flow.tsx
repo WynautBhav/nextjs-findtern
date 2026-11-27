@@ -24,8 +24,9 @@ const DRILL: Record<string, { title: string; filters: DrillFilters }> = {
   notAnswered: { title: "Students with an offer not answered", filters: { outcome: "open" } },
   rejected: { title: "Students who rejected an offer", filters: { outcome: "rejected" } },
   withdrawn: { title: "Students with an offer withdrawn", filters: { outcome: "withdrawn" } },
-  h: { title: "Students with an internship", filters: { placement: "hired" } },
-  p: { title: "Students with a PPO offer", filters: { placement: "ppo" } },
+  h: { title: "Students hired on an internship", filters: { outcome: "internship" } },
+  d: { title: "Students who accepted a direct PPO", filters: { outcome: "ppo-direct" } },
+  p: { title: "Students who accepted a PPO after the internship", filters: { outcome: "ppo-after" } },
 };
 
 function ribbon(x0: number, y0: number, h0: number, x1: number, y1: number, h1: number) {
@@ -35,8 +36,8 @@ function ribbon(x0: number, y0: number, h0: number, x1: number, y1: number, h1: 
 
 /**
  * Placement 2, "Sankey flow": students flow left to right: interviewed, then split into got an offer and no offer; the
- * offers they hold (a student can hold several) split by what happened to each; accepted offers lead on to internships
- * and then PPOs. Student stages share one scale and offer stages another, joined where the offer node widens into its
+ * offers they hold (a student can hold several) split by what happened to each; accepted offers split into internships
+ * and direct PPOs (a full-time offer with no internship first), and internships lead on to PPOs after the internship. Student stages share one scale and offer stages another, joined where the offer node widens into its
  * four outcomes. Bands and scores sit under the flow.
  */
 export function SankeyFlow({ data }: { data: PlacementData }) {
@@ -69,9 +70,13 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
   const hiredS = data.internships;
   // Internships and PPOs keep the Accepted node's scale, so a raised small node never shrinks them.
   const perOffer = o.accepted ? acc.h / o.accepted : col2.scale;
-  const intern: Node = { id: "h", label: "Internships", v: hiredS, x: X(3), y: 28, h: hiredS * perOffer, fill: GOLD, below: true };
-  const ppo: Node = { id: "p", label: "PPO", v: data.ppo, x: X(4), y: 62, h: data.ppo * perOffer, fill: GOLD, below: true };
-  const nodes = [interviewed, offer, none, ...outs, intern, ppo];
+  const intern: Node = { id: "h", label: "Internship", v: hiredS, x: X(3), y: 28, h: hiredS * perOffer, fill: GOLD, below: true };
+  // Under the internship, past its label.
+  const direct: Node = { id: "d", label: "Direct PPO", v: data.ppoDirect, x: X(3), y: intern.y + intern.h + 52, h: data.ppoDirect * perOffer, fill: GOLD, below: true };
+  const ppo: Node = { id: "p", label: "PPO after internship", v: data.ppoAfter, x: X(4), y: 62, h: data.ppoAfter * perOffer, fill: GOLD, below: true };
+  const nodes = [interviewed, offer, none, ...outs, intern, direct, ppo];
+  // A tall internship block pushes Direct PPO down: the chart grows rather than clip its label.
+  const height = Math.max(H, direct.y + direct.h + 44);
 
   // Ribbons.
   const ribbons: { d: string; fill: string }[] = [];
@@ -85,7 +90,9 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
   }
   const hSrc = Math.min(hiredS, o.accepted) * perOffer;
   ribbons.push({ d: ribbon(acc.x + NW, acc.y, hSrc, intern.x, intern.y, intern.h), fill: goldA(0.3) });
-  const pSrc = Math.min(data.ppo, hiredS) * perOffer;
+  const dSrc = Math.min(data.ppoDirect, Math.max(0, o.accepted - Math.min(hiredS, o.accepted))) * perOffer;
+  ribbons.push({ d: ribbon(acc.x + NW, acc.y + hSrc, dSrc, direct.x, direct.y, direct.h), fill: goldA(0.3) });
+  const pSrc = Math.min(data.ppoAfter, hiredS) * perOffer;
   ribbons.push({ d: ribbon(intern.x + NW, intern.y, pSrc, ppo.x, ppo.y, ppo.h), fill: goldA(0.3) });
 
   return (
@@ -93,19 +100,19 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
       label="Flow from AI interview to offers, internships and PPOs"
       finding={
         <>
-          {n(data.withOffer)} of {n(inter)} interviewed students got an offer; {n(o.accepted)} of their {n(o.received)} offers were accepted and {n(data.internships)} became internships, {n(data.ppo)} with a PPO.
+          {n(data.withOffer)} of {n(inter)} interviewed students got an offer; {n(o.accepted)} of their {n(o.received)} offers were accepted: {n(data.internships)} internships and {n(data.ppoDirect)} direct PPOs, and {n(data.ppoAfter)} {data.ppoAfter === 1 ? "intern" : "interns"} got a PPO after the internship.
         </>
       }
     >
-      <div className="relative" style={{ height: H }}>
-        <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 size-full">
+      <div className="relative" style={{ height }}>
+        <svg aria-hidden viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" className="absolute inset-0 size-full">
           {ribbons.map((r, i) => (r.d ? <path key={i} d={r.d} fill={r.fill} /> : null))}
           {nodes.map((nd) => (
             <rect key={nd.id} x={nd.x} y={nd.y} width={NW} height={nd.h} fill={nd.fill} />
           ))}
         </svg>
         {nodes.map((nd) => {
-          const style = { left: `${(nd.x / W) * 100}%`, width: `${(NW / W) * 100}%`, top: `${((nd.below ? nd.y + nd.h + 4 : nd.y) / H) * 100}%`, height: nd.below ? undefined : `${(nd.h / H) * 100}%` };
+          const style = { left: `${(nd.x / W) * 100}%`, width: `${(NW / W) * 100}%`, top: `${((nd.below ? nd.y + nd.h + 4 : nd.y) / height) * 100}%`, height: nd.below ? undefined : `${(nd.h / height) * 100}%` };
           const tight = !nd.below && nd.h < 50;
           const txt = nd.below ? "white" : onFill(nd.fill);
           return (
@@ -115,7 +122,7 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
               filters={DRILL[nd.id].filters}
               aria-label={`${nd.label}: ${nd.v}. Open in Master data`}
               className={cn(nd.below ? "absolute rounded-sm text-center" : cn("absolute grid text-center", tight ? "place-items-center" : "place-content-center"), "outline-none ring-white/0 transition-[box-shadow] hover:ring-2 hover:ring-white/60 focus-visible:ring-2 focus-visible:ring-white", nd.h === 0 && !nd.below && "pointer-events-none")}
-              style={nd.below ? { ...style, top: `${(nd.y / H) * 100}%`, paddingTop: nd.h + 4 } : style}
+              style={nd.below ? { ...style, top: `${(nd.y / height) * 100}%`, paddingTop: nd.h + 4 } : style}
             >
               {nd.h === 0 && !nd.below ? null : (
                 <span className={tight ? "flex items-baseline justify-center gap-1.5" : "contents"}>

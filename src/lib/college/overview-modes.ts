@@ -47,8 +47,13 @@ export type PlacementData = {
   avgScore: number | null;
   offers: { received: number; accepted: number; rejected: number; notAnswered: number; withdrawn: number };
   withOffer: number;
+  /** Students hired on an internship; full-time offers are the two PPO counts. */
   internships: number;
+  /** Students with a PPO offer of any kind still standing (Master data's "PPO offer"). */
   ppo: number;
+  /** Students who accepted a full-time offer with no internship first, and those who accepted one after their internship. */
+  ppoDirect: number;
+  ppoAfter: number;
   /** Employer meetings; other = booked and never closed after its time. students = students with at least one. */
   /** The drive board's meeting stages (meet-outcome.ts), over every employer: they add up to total. */
   meetings: { total: number; sent: number; accepted: number; completed: number; expired: number; withdrawn: number; students: number };
@@ -126,8 +131,10 @@ export function overviewModes(all: MasterRow[]): OverviewModes {
       avgScore: avg1(interviewed.map((r) => r.score!)),
       offers,
       withOffer: rows.filter((r) => r.offers > 0).length,
-      internships: rows.filter((r) => r.hired).length,
+      internships: rows.filter((r) => r.internship).length,
       ppo: rows.filter((r) => r.ppo).length,
+      ppoDirect: rows.filter((r) => r.ppoDirect).length,
+      ppoAfter: rows.filter((r) => r.ppoAfter).length,
       meetings,
     },
   };

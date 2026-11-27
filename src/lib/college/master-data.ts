@@ -71,6 +71,12 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = u.id AND (pr.hired_at IS NOT NULL OR pr.status IN ('hired', 'completed')) AND ${realEmployerId(sql`pr.employer_id`)}) AS hired,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = u.id AND pr.status NOT IN ('draft', 'withdrawn')
           AND jsonb_typeof(pr.offer_details->'fullTimeOffer') = 'object' AND ${realEmployerId(sql`pr.employer_id`)}) AS ppo,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = u.id AND (pr.hired_at IS NOT NULL OR pr.status IN ('hired', 'completed'))
+          AND jsonb_typeof(pr.offer_details->'fullTimeOffer') IS DISTINCT FROM 'object' AND ${realEmployerId(sql`pr.employer_id`)}) AS internship,
+        (SELECT count(*) FILTER (WHERE NOT (pr.offer_details->'fullTimeOffer') ? 'baseProposalId') FROM ${schema.proposals} pr WHERE pr.intern_id = u.id
+          AND pr.status IN (${acceptedStatusesSql()}) AND jsonb_typeof(pr.offer_details->'fullTimeOffer') = 'object' AND ${realEmployerId(sql`pr.employer_id`)}) AS ppo_direct,
+        (SELECT count(*) FILTER (WHERE (pr.offer_details->'fullTimeOffer') ? 'baseProposalId') FROM ${schema.proposals} pr WHERE pr.intern_id = u.id
+          AND pr.status IN (${acceptedStatusesSql()}) AND jsonb_typeof(pr.offer_details->'fullTimeOffer') = 'object' AND ${realEmployerId(sql`pr.employer_id`)}) AS ppo_after,
         (SELECT coalesce(sum(w.amount_minor), 0) FROM ${schema.collegeWalletEntries} w
           WHERE w.college_id = ${ctx.college.id} AND w.intern_id = u.id AND w.kind = 'incentive') AS earnings_minor
       FROM ${schema.users} u
@@ -94,6 +100,9 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
         offersOpen: Number(r.offers_open ?? 0),
         hired: Number(r.hired ?? 0),
         ppo: Number(r.ppo ?? 0),
+        internship: Number(r.internship ?? 0),
+        ppoDirect: Number(r.ppo_direct ?? 0),
+        ppoAfter: Number(r.ppo_after ?? 0),
         earningsMinor: Number(r.earnings_minor ?? 0),
         meetings: meetings.get(String(r.user_id)) ?? NO_MEETINGS,
       });

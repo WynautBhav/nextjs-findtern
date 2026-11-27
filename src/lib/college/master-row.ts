@@ -55,6 +55,12 @@ export type MasterRow = {
   marks10: number | null;
   hired: boolean;
   ppo: boolean;
+  /** Hired on an internship (not a full-time offer). */
+  internship: boolean;
+  /** Accepted a full-time offer made with no internship first. */
+  ppoDirect: boolean;
+  /** Accepted a full-time offer made to them as a hired intern. */
+  ppoAfter: boolean;
   /** College earnings from this student's hires, in paise. */
   earningsMinor: number;
   /** Meetings employers asked this student for (meetings/slots.ts statuses). */
@@ -77,13 +83,16 @@ export type Meetings = {
 export const NO_MEETINGS: Meetings = { total: 0, done: 0, missed: 0, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, notClosed: 0, notJoined: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 };
 
 /** Drill-down groups from the Placement analysis: the students behind each block. "" = everyone. */
-export type Outcome = "" | "no-offer" | "accepted" | "open" | "rejected" | "withdrawn" | "met" | "meet-upcoming" | "meet-waiting" | "not-accepted" | "meet-missed" | "meet-called-off" | "meet-withdrawn" | "meet-other" | "meet-expired" | "meet-any-withdrawn" | "call-took" | "call-waiting" | "call-not-taken";
+export type Outcome = "" | "no-offer" | "accepted" | "open" | "rejected" | "withdrawn" | "internship" | "ppo-direct" | "ppo-after" | "met" | "meet-upcoming" | "meet-waiting" | "not-accepted" | "meet-missed" | "meet-called-off" | "meet-withdrawn" | "meet-other" | "meet-expired" | "meet-any-withdrawn" | "call-took" | "call-waiting" | "call-not-taken";
 export const OUTCOMES: { key: Exclude<Outcome, "">; label: string }[] = [
   { key: "no-offer", label: "Interviewed, no offer" },
   { key: "accepted", label: "Accepted an offer" },
   { key: "open", label: "Offer not answered" },
   { key: "rejected", label: "Rejected an offer" },
   { key: "withdrawn", label: "Offer withdrawn or closed" },
+  { key: "internship", label: "Hired on an internship" },
+  { key: "ppo-direct", label: "Accepted a direct PPO" },
+  { key: "ppo-after", label: "Accepted a PPO after the internship" },
   { key: "met", label: "Had a meeting" },
   { key: "meet-upcoming", label: "Meeting booked" },
   { key: "meet-waiting", label: "Meeting not answered yet" },
@@ -109,6 +118,9 @@ export function matchesOutcome(r: MasterRow, o: Outcome): boolean {
     case "open": return r.offersOpen > 0;
     case "rejected": return r.offersRejected + r.offersLapsed > 0;
     case "withdrawn": return withdrawnOf(r) > 0;
+    case "internship": return r.internship;
+    case "ppo-direct": return r.ppoDirect;
+    case "ppo-after": return r.ppoAfter;
     case "met": return r.meetings.done > 0;
     case "meet-upcoming": return r.meetings.upcoming > 0;
     case "meet-waiting": return r.meetings.waiting > 0;
@@ -159,6 +171,9 @@ export type MasterExtras = {
   offersOpen: number;
   hired: number;
   ppo: number;
+  internship: number;
+  ppoDirect: number;
+  ppoAfter: number;
   earningsMinor: number;
   meetings: Meetings;
 };
@@ -243,6 +258,9 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     marks10: null,
     hired: false,
     ppo: false,
+    internship: false,
+    ppoDirect: false,
+    ppoAfter: false,
     earningsMinor: 0,
     meetings: NO_MEETINGS,
     openToWork: null,
@@ -294,6 +312,9 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     marks10: s.cgpa,
     hired: x.hired > 0,
     ppo: x.ppo > 0,
+    internship: x.internship > 0,
+    ppoDirect: x.ppoDirect > 0,
+    ppoAfter: x.ppoAfter > 0,
     earningsMinor: x.earningsMinor,
     meetings: x.meetings,
     openToWork: s.openToWork,
