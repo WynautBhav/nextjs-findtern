@@ -232,13 +232,17 @@ export const emails = {
     reason: `You’re getting this because a proposal update is waiting for you on Findtern. Turn these emails off in your notification settings: ${o.settingsUrl}`,
   }),
 
-  proposalReceived: (o: { internName: string; companyName: string; role: string; proposalId: string }): EmailContent => ({
+  proposalReceived: (o: { internName: string; companyName: string; role: string; proposalId: string; /** Joined with a college code: no guarantee, no decline limit (guarantee.ts). */ noGuarantee?: boolean }): EmailContent => ({
     subject: "You’ve received a new internship proposal on Findtern",
     preheader: `${o.companyName} sent you a proposal for ${o.role}. Respond from your dashboard.`,
     heading: "You’ve received a new proposal",
     greeting: hi(o.internName),
     lines: [`${o.companyName} has sent you an internship proposal for the role of ${o.role}.`],
-    bullets: ["Read the proposal details carefully", "Accept it if it fits your goals", "You can turn down up to 3 offers; a 4th decline or lapse ends the refund guarantee"],
+    bullets: [
+      "Read the proposal details carefully",
+      "Accept it if it fits your goals",
+      o.noGuarantee ? "You can turn down as many offers as you want" : "You can turn down up to 3 offers; a 4th decline or lapse ends the refund guarantee",
+    ],
     status: "Awaiting your response",
     cta: ctaTo("View proposal", `/intern/proposals/${o.proposalId}`),
   }),

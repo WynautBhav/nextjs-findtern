@@ -1,4 +1,5 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { CODE_VERIFIED_BY } from "@/lib/intern-account";
 import { Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
@@ -27,7 +28,7 @@ import { ButtonAnchor } from "@/components/ui/button";
 
 async function load() {
   const db = getDb();
-  const [employers, proposals, interviews, onboarding, cgpaRows, expiredSources] = await Promise.all([
+  const [employers, proposals, interviews, onboarding, codeMembers, cgpaRows, expiredSources] = await Promise.all([
     db
       .select({
         id: schema.employers.id,
@@ -96,6 +97,11 @@ async function load() {
       .select({ userId: schema.internOnboarding.userId, endedAt: sql<string | null>`${schema.internOnboarding.extraData}->>'guaranteeEndedAt'` })
       .from(schema.internOnboarding)
       .where(sql`${schema.internOnboarding.extraData} ? 'guaranteeEndedAt'`),
+    // College-code students have no guarantee (guarantee.ts guaranteeState); only their memberships can change the flag.
+    db
+      .select({ userId: schema.collegeMemberships.userId, status: schema.collegeMemberships.status, verifiedBy: schema.collegeMemberships.verifiedBy, leftAt: schema.collegeMemberships.leftAt })
+      .from(schema.collegeMemberships)
+      .where(and(eq(schema.collegeMemberships.status, "verified"), isNull(schema.collegeMemberships.leftAt), inArray(schema.collegeMemberships.verifiedBy, [...CODE_VERIFIED_BY]))),
     // Only the checks that can hold a payment (pending, or corrected and not yet confirmed): the pipeline marks those offers.
     db
       .select({ userId: schema.internOnboarding.userId, cgpa: sql<unknown>`${schema.internOnboarding.extraData}->'cgpaVerification'` })
@@ -107,7 +113,12 @@ async function load() {
   const cgpaByIntern = new Map<string, unknown>();
   for (const r of cgpaRows) if (!cgpaByIntern.has(r.userId)) cgpaByIntern.set(r.userId, { cgpaVerification: r.cgpa }); // latest row wins
   // From every proposal, not the filtered page rows: same inputs as the intern's own offer page.
-  const noGuarantee = ineligibleInterns(proposals, new Map(onboarding.map((o) => [o.userId, { guaranteeEndedAt: o.endedAt }])));
+  const noGuarantee = ineligibleInterns(
+    proposals,
+    new Map(onboarding.map((o) => [o.userId, { guaranteeEndedAt: o.endedAt }])),
+    new Date(),
+    new Map(codeMembers.map((m) => [m.userId, m])),
+  );
   return { noGuarantee, cgpaByIntern, expiredSources, employers, proposals, interviews: interviews.map(({ companyEmail, ...i }) => ({ ...i, isAi: isAiInterview(i.employerId, companyEmail) })) };
 }
 

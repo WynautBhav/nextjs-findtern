@@ -1,4 +1,4 @@
-import { guaranteeEnded, guaranteeMisses } from "../guarantee.ts";
+import { guaranteeMisses, guaranteeState } from "../guarantee.ts";
 import { interviewLifecycle, type InterviewLifecycle } from "../interview-lifecycle.ts";
 import { parseOffer } from "../offer.ts";
 import { effectiveProposalStatus, expiryOf, type ExpiryReason } from "../proposal-expiry.ts";
@@ -143,17 +143,19 @@ export function sortBy<T>(rows: T[], key: (r: T) => string | number | null, dir:
 /**
  * Interns the pipeline flags "Not eligible for guarantee". Takes every one of
  * the intern's proposals (not the date-filtered page rows) and the same
- * `guaranteeEnded` the intern's offer screens use, so the two always agree.
+ * `guaranteeState` the intern's offer screens use, so the two always agree: an ended guarantee, or none because the
+ * student joined with a college code.
  */
 export function ineligibleInterns(
   proposals: { internId: string; status: string; offerDetails: unknown; currency: string | null }[],
   extraByIntern: Map<string, unknown>,
   now: Date = new Date(),
+  membershipByIntern: Map<string, { status: string; verifiedBy: string | null; leftAt?: Date | null }> = new Map(),
 ): Set<string> {
   const byIntern = new Map<string, typeof proposals>();
   for (const p of proposals) byIntern.set(p.internId, [...(byIntern.get(p.internId) ?? []), p]);
   const out = new Set<string>();
-  for (const [id, rows] of byIntern) if (guaranteeEnded(extraByIntern.get(id), guaranteeMisses(rows, now))) out.add(id);
+  for (const [id, rows] of byIntern) if (guaranteeState(extraByIntern.get(id), guaranteeMisses(rows, now), membershipByIntern.get(id)) !== "active") out.add(id);
   return out;
 }
 

@@ -62,6 +62,12 @@ test("pipeline flag matches the intern's guarantee state", () => {
   assert.deepEqual([...flagged].sort(), ["a", "c"]);
 });
 
+test("a student who joined with a college code is flagged: no guarantee, however few offers they missed", () => {
+  const rows = [p({ internId: "d", status: "rejected", offerDetails: { declinedBy: "intern" } }), p({ internId: "e" })];
+  const members = new Map([["d", { status: "verified", verifiedBy: "college_code", leftAt: null }], ["e", { status: "verified", verifiedBy: "email_domain", leftAt: null }]]);
+  assert.deepEqual([...ineligibleInterns(rows, new Map(), new Date("2026-11-04T06:00:00Z"), members)], ["d"]);
+});
+
 // ── True status on the pipeline (the owner's screenshot: "Scheduled" for meetings already over) ──
 import { upcomingInterviewCount, withTrueInterviewStatus, withTrueProposalStatus } from "./tracker.ts";
 

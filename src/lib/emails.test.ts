@@ -194,3 +194,11 @@ test("interview emails carry no meeting link", () => {
   const mails = [emails.interviewReminder({ name: "A", pending: false, text: "Soon", link }), emails.interviewLinkReady({ name: "A", forEmployer: false })];
   for (const m of mails) assert.doesNotMatch(JSON.stringify(m), /meet\.example|meet\.google|\/meet\//);
 });
+
+test("the new-offer email promises no decline limit to a student who joined with a college code", () => {
+  const base = { internName: "A", companyName: "B", role: "C", proposalId: "p1" };
+  assert.match(JSON.stringify(emails.proposalReceived(base)), /turn down up to 3 offers/);
+  const college = JSON.stringify(emails.proposalReceived({ ...base, noGuarantee: true }));
+  assert.doesNotMatch(college, /up to 3|refund guarantee/);
+  assert.match(college, /as many offers as you want/);
+});

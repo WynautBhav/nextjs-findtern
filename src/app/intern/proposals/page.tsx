@@ -22,7 +22,7 @@ import { loadInternData, projectNames, takenDownProjectIds } from "@/lib/intern-
 import { cn } from "@/lib/utils";
 import { canDecide, internOfferOverlay, offerGroup, type InternOfferOverlay } from "@/lib/intern-offer-view";
 import type { ProposalRow } from "@/lib/journey";
-import { guaranteeEnded as isGuaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
+import { guaranteeMisses, guaranteeState, type GuaranteeState } from "@/lib/guarantee";
 import { FREE_DECLINES } from "@/lib/offer";
 import { TAKEDOWN_BLOCKS } from "@/lib/projects/takedown";
 import { LiveRefresh } from "@/components/app/live-refresh";
@@ -60,7 +60,7 @@ export default async function InternProposals({ searchParams }: { searchParams: 
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
   const score = Number(extra.findternScore ?? 0) || 0;
   const misses = guaranteeMisses(data.proposals);
-  const guaranteeEnded = isGuaranteeEnded(extra, misses);
+  const guarantee = guaranteeState(extra, misses, data.membership);
   const declinesUsed = misses.total;
 
   // Drafts are the company's, not the intern's.
@@ -82,7 +82,7 @@ export default async function InternProposals({ searchParams }: { searchParams: 
     closed: rows.filter((r) => groupOf(r) === "closed"),
   };
 
-  const decision = { declinesUsed, guaranteeEnded };
+  const decision = { declinesUsed, guarantee };
   const waiting = groups.open.filter((r) => canDecide(r.facts.key)).length;
   // Default view: what needs an answer, else everything.
   const view: GroupKey | "all" =
@@ -172,7 +172,7 @@ function Group({
   title: string;
   hint?: string;
   rows: Row[];
-  decision: { declinesUsed: number; guaranteeEnded: boolean };
+  decision: { declinesUsed: number; guarantee: GuaranteeState };
   /** Closed offers: quieter rows, no work details. */
   compact?: boolean;
   /** In "All" each group names itself; filtered, the tab (and its hint) already does, so rows drop the repeat. */
@@ -203,7 +203,7 @@ function OfferRow({
   compact,
   hideStatus,
 }: Row & {
-  decision: { declinesUsed: number; guaranteeEnded: boolean };
+  decision: { declinesUsed: number; guarantee: GuaranteeState };
   compact: boolean;
   hideStatus?: string;
 }) {
@@ -263,7 +263,7 @@ function OfferRow({
             fullTime={facts.fullTime}
             declinesUsed={decision.declinesUsed}
             freeDeclines={FREE_DECLINES}
-            guaranteeEnded={decision.guaranteeEnded}
+            guarantee={decision.guarantee}
             acceptBlocked={takenDown ? TAKEDOWN_BLOCKS.accept : null}
             aside={
               <Link

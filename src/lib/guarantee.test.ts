@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { GUARANTEE_MONTHS, guaranteeEnded, guaranteeMisses } from "./guarantee.ts";
+import { GUARANTEE_MONTHS, guaranteeEnded, guaranteeMisses, guaranteeState } from "./guarantee.ts";
 
 const now = new Date("2026-11-04T06:00:00Z");
 const declined = { status: "rejected", offerDetails: { declinedBy: "intern" } };
@@ -96,4 +96,20 @@ test("a declined or lapsed full-time conversion offer does not count; internship
 
 test("the guarantee window is 6 months", () => {
   assert.equal(GUARANTEE_MONTHS, 6);
+});
+
+// Owner, 27 Nov 2026: a student who entered their college's code has no Findtern placement guarantee, so they can turn
+// down as many offers as they want. Trigger data: four declines, which end the guarantee of anyone else.
+test("a student who joined with a college code has no guarantee: no miss limit, never 'ended'", () => {
+  const declined = { status: "rejected", offerDetails: { declinedBy: "intern" } };
+  const misses = guaranteeMisses([declined, declined, declined, declined]);
+  const member = (verifiedBy: string, extra: Record<string, unknown> = {}) => ({ status: "verified", verifiedBy, leftAt: null, ...extra });
+  for (const by of ["college_code", "promo", "drive_code", "roster", "tpo"]) assert.equal(guaranteeState({}, misses, member(by)), "none", by);
+  // Same misses, no code: the guarantee ends as before.
+  assert.equal(guaranteeState({}, misses, null), "ended");
+  assert.equal(guaranteeState({}, guaranteeMisses([declined]), null), "active");
+  // A college email alone is not a code; a student who left the college is back on the guarantee.
+  assert.equal(guaranteeState({}, guaranteeMisses([declined]), member("email_domain")), "active");
+  assert.equal(guaranteeState({}, guaranteeMisses([declined]), member("college_code", { leftAt: new Date() })), "active");
+  assert.equal(guaranteeState({}, guaranteeMisses([declined]), member("college_code", { status: "claimed" })), "active");
 });

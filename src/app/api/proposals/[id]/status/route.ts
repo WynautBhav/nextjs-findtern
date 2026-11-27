@@ -15,7 +15,7 @@ import { sendSmtpMail } from "@/lib/mailer";
 import { SITE } from "@/lib/content/site";
 import { initialsOf } from "@/lib/employer-candidates";
 import { employerNames, internFirstName, notify, resolveOfferNotifications } from "@/lib/notify";
-import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
+import { guaranteeMisses, guaranteeState } from "@/lib/guarantee";
 import { FREE_DECLINES, offerPastStart, parseOffer, todayIst } from "@/lib/offer";
 import { feeRateLabel, fullTimeRate } from "@/lib/checkout";
 import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
@@ -204,13 +204,20 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       .from(schema.internOnboarding)
       .where(eq(schema.internOnboarding.userId, proposal.internId))
       .limit(1);
-    const previous = await db
-      .select({ status: schema.proposals.status, offerDetails: schema.proposals.offerDetails, currency: schema.proposals.currency })
-      .from(schema.proposals)
-      .where(eq(schema.proposals.internId, proposal.internId));
+    const [previous, [membership]] = await Promise.all([
+      db
+        .select({ status: schema.proposals.status, offerDetails: schema.proposals.offerDetails, currency: schema.proposals.currency })
+        .from(schema.proposals)
+        .where(eq(schema.proposals.internId, proposal.internId)),
+      db
+        .select({ status: schema.collegeMemberships.status, verifiedBy: schema.collegeMemberships.verifiedBy, leftAt: schema.collegeMemberships.leftAt })
+        .from(schema.collegeMemberships)
+        .where(eq(schema.collegeMemberships.userId, proposal.internId))
+        .limit(1),
+    ]);
     const misses = guaranteeMisses(previous);
-    const ended = guaranteeEnded(onboarding?.extraData, misses);
-    if (!ended && misses.total >= FREE_DECLINES) {
+    // A student who joined with a college code has no guarantee to lose: they decline freely (guarantee.ts).
+    if (guaranteeState(onboarding?.extraData, misses, membership) === "active" && misses.total >= FREE_DECLINES) {
       if (!parsed.data.acknowledgeGuaranteeEnd) {
         return NextResponse.json(
           {

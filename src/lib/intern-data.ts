@@ -50,7 +50,7 @@ export const AI_INTERVIEW_NAME = "AI Interview";
 export const loadInternData = cache(async (uid: string) => {
   const db = getDb();
 
-  const [proposals, interviews, timesheets, payouts, onboarding, document, employerRows] = await Promise.all([
+  const [proposals, interviews, timesheets, payouts, onboarding, document, employerRows, membership] = await Promise.all([
     db.select().from(schema.proposals).where(eq(schema.proposals.internId, uid)).orderBy(desc(schema.proposals.createdAt)),
     db.select().from(schema.interviews).where(eq(schema.interviews.internId, uid)).orderBy(desc(schema.interviews.createdAt)),
     db.select().from(schema.timesheets).where(eq(schema.timesheets.internId, uid)).orderBy(desc(schema.timesheets.createdAt)),
@@ -68,6 +68,11 @@ export const loadInternData = cache(async (uid: string) => {
           inArray(schema.employers.id, db.select({ id: schema.interviews.employerId }).from(schema.interviews).where(eq(schema.interviews.internId, uid))),
         ),
       ),
+    db
+      .select({ status: schema.collegeMemberships.status, verifiedBy: schema.collegeMemberships.verifiedBy, leftAt: schema.collegeMemberships.leftAt })
+      .from(schema.collegeMemberships)
+      .where(eq(schema.collegeMemberships.userId, uid))
+      .limit(1),
   ]);
 
   const p = proposals as ProposalRow[];
@@ -123,6 +128,8 @@ export const loadInternData = cache(async (uid: string) => {
     payouts: r,
     onboarding: onboarding[0] ?? null,
     document: document[0] ?? null,
+    /** The college membership, for the guarantee (guarantee.ts guaranteeState: a college code means none). */
+    membership: membership[0] ?? null,
     names,
     /** Ids of this intern's accepted offers that have an unpaid payment order open (frozen against expiry). */
     openOrderIds,

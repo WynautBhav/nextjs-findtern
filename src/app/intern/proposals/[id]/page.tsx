@@ -23,7 +23,7 @@ import { formatDate, formatMoney, shortDate } from "@/lib/format";
 import { canDecide, hybridSplit, internOfferOverlay, offerJoiningDay, shiftInIst } from "@/lib/intern-offer-view";
 import { toArray } from "@/lib/journey";
 import { sanitizeRichText } from "@/lib/richtext";
-import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
+import { guaranteeMisses, guaranteeState } from "@/lib/guarantee";
 import { FREE_DECLINES, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { takedownBlock } from "@/lib/projects/takedown";
 
@@ -239,7 +239,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                   fullTime={fullTime}
                   declinesUsed={misses.total}
                   freeDeclines={FREE_DECLINES}
-                  guaranteeEnded={guaranteeEnded(extra, misses)}
+                  guarantee={guaranteeState(extra, misses, data.membership)}
                   bonusLabel={bonusLabel}
                   acceptBlocked={takedownBlock(project.row, "accept")}
                 />

@@ -38,6 +38,7 @@ import { formatDate } from "@/lib/format";
 import { addDays } from "@/lib/offer";
 import { cn } from "@/lib/utils";
 import { NewTabHint } from "@/components/ui/new-tab-link";
+import type { GuaranteeState } from "@/lib/guarantee";
 
 type Outcome = { kind: "accepted" | "declined"; error?: string };
 
@@ -50,7 +51,7 @@ export function OfferDecision({
   fullTime = false,
   declinesUsed = 0,
   freeDeclines = 3,
-  guaranteeEnded = false,
+  guarantee = "active",
   bonusLabel = null,
   acceptBlocked = null,
   layout = "rail",
@@ -68,7 +69,8 @@ export function OfferDecision({
   /** Offers this intern has already turned down. */
   declinesUsed?: number;
   freeDeclines?: number;
-  guaranteeEnded?: boolean;
+  /** guarantee.ts guaranteeState: `none` is a student who joined with a college code, who declines freely. */
+  guarantee?: GuaranteeState;
   /** e.g. "+ ₹2,500 completion bonus when you finish", worked out on the server; null when none is promised. */
   bonusLabel?: string | null;
   /** Why this offer can't be accepted right now (Findtern took its listing down). Accept is disabled and says why; turning it down stays open. */
@@ -96,7 +98,7 @@ export function OfferDecision({
   // Declining past the free allowance ends the refund under the guarantee;
   // it is allowed, but only after the intern has seen that consequence.
   // A full-time conversion offer never counts as a miss (guarantee.ts).
-  const endsGuarantee = !fullTime && declinesUsed >= freeDeclines && !guaranteeEnded;
+  const endsGuarantee = !fullTime && declinesUsed >= freeDeclines && guarantee === "active";
   const freeLeft = Math.max(0, freeDeclines - declinesUsed);
   const joiningDay = joiningDate === undefined ? startDate : joiningDate;
   const joining = joiningDay ? formatDate(joiningDay) : null;
@@ -243,7 +245,9 @@ export function OfferDecision({
             </p>
           ) : null}
           <p>
-            {guaranteeEnded
+            {guarantee === "none"
+              ? "You joined through your college, so you can turn down as many offers as you want."
+              : guarantee === "ended"
               ? "Your placement guarantee has ended, so declines no longer affect a refund."
               : fullTime
                 ? "Turning down a full-time offer does not count against your placement guarantee."
@@ -335,7 +339,7 @@ export function OfferDecision({
               This action can&apos;t be undone. {roleTitle} will be marked as rejected and the company is told.
             </DialogDescription>
           </DialogHeader>
-          {guaranteeEnded ? null : fullTime ? (
+          {guarantee !== "active" ? null : fullTime ? (
             <p className="text-pretty text-sm leading-relaxed text-ink-600">
               Turning down a full-time offer does not count against your placement guarantee.
             </p>

@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { isCodeVerifiedMembership } from "@/lib/intern-account";
 import { after, NextResponse } from "next/server";
 
 import { isHiredProposal } from "@/lib/hire-status";
@@ -354,15 +355,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // The proposal is saved; tell the intern after responding, so the composer
   // is not held on the SMTP round-trip (bug sheet 22 Oct: "kept me on send
   // proposal page") and a mail failure cannot turn a sent offer into a 500.
-  after(() =>
-    notify({
-      to: { type: "intern", id: b.internId },
-      type: "proposal_received",
-      title: "New proposal",
-      message: `You have a new internship proposal for ${b.roleTitle}.`,
-      data: { proposalId: proposal.id },
-      email: emails.proposalReceived({ internName: user.firstName, companyName, role: b.roleTitle, proposalId: proposal.id }),
-    }).catch((e) => console.error("[employer/proposals] notify", e)),
-  );
+  after(async () => {
+    try {
+      // A college-code student has no decline limit, so the email doesn't promise one (guarantee.ts guaranteeState).
+      const [membership] = await db
+        .select({ status: schema.collegeMemberships.status, verifiedBy: schema.collegeMemberships.verifiedBy, leftAt: schema.collegeMemberships.leftAt })
+        .from(schema.collegeMemberships)
+        .where(eq(schema.collegeMemberships.userId, b.internId))
+        .limit(1);
+      await notify({
+        to: { type: "intern", id: b.internId },
+        type: "proposal_received",
+        title: "New proposal",
+        message: `You have a new internship proposal for ${b.roleTitle}.`,
+        data: { proposalId: proposal.id },
+        email: emails.proposalReceived({ internName: user.firstName, companyName, role: b.roleTitle, proposalId: proposal.id, noGuarantee: isCodeVerifiedMembership(membership) }),
+      });
+    } catch (e) {
+      console.error("[employer/proposals] notify", e);
+    }
+  });
   return NextResponse.json({ proposal: { id: proposal.id, status: proposal.status } }, { status: 201 });
 }

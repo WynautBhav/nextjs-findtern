@@ -12,10 +12,11 @@ import { formatJoiningDate } from "@/lib/format";
 import { canDecide } from "@/lib/intern-offer-view";
 import type { ProposalRow } from "@/lib/journey";
 import { FREE_DECLINES } from "@/lib/offer";
+import type { GuaranteeState } from "@/lib/guarantee";
 import { cn } from "@/lib/utils";
 
 export type OfferCardRow = { p: ProposalRow; facts: OfferFacts; project: string | null };
-export type OfferCardDecision = { declinesUsed: number; guaranteeEnded: boolean };
+export type OfferCardDecision = { declinesUsed: number; guarantee: GuaranteeState };
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 
@@ -83,7 +84,7 @@ export function OfferCard({ p, facts, project, decision }: OfferCardRow & { deci
               fullTime={facts.fullTime}
               declinesUsed={decision.declinesUsed}
               freeDeclines={FREE_DECLINES}
-              guaranteeEnded={decision.guaranteeEnded}
+              guarantee={decision.guarantee}
             />
             <Link href={href} className={cn("inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-brand-700 hover:text-brand-800", FOCUS)}>
               Read the full offer

@@ -1,4 +1,5 @@
 import { FREE_DECLINES, offerPastStart, parseOffer } from "./offer.ts";
+import { isCodeVerifiedMembership } from "./intern-account.ts";
 
 /**
  * Placement-guarantee eligibility (owner answers #7/#16, C5). One pure
@@ -44,6 +45,23 @@ export function guaranteeMisses(proposals: GuaranteeProposal[], now: Date = new 
 export function guaranteeEnded(extraData: unknown, misses: { total: number }): boolean {
   const stamp = ((extraData ?? {}) as Record<string, unknown>).guaranteeEndedAt;
   return typeof stamp === "string" || misses.total > FREE_DECLINES;
+}
+
+/**
+ * The one answer to "what is this intern's guarantee?", for the decline route, the offer screens, the admin tracker
+ * and the new-offer email. `none`: the student joined through their college with a code (a college, TPO or drive code,
+ * the roster, or the officer's approval: intern-account.ts CODE_VERIFIED_BY), which carries no Findtern guarantee,
+ * so declines and lapses are never counted against them (owner, 27 Nov 2026). A college email alone is not a code.
+ */
+export type GuaranteeState = "active" | "ended" | "none";
+
+export function guaranteeState(
+  extraData: unknown,
+  misses: { total: number },
+  membership: { status: string; verifiedBy: string | null; leftAt?: Date | null } | null | undefined,
+): GuaranteeState {
+  if (isCodeVerifiedMembership(membership)) return "none";
+  return guaranteeEnded(extraData, misses) ? "ended" : "active";
 }
 
 /**
