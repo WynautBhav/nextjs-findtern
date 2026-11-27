@@ -1,5 +1,5 @@
 import { bandFor, PLAN_NAME } from "../score.ts";
-import type { MasterRow } from "./master-row.ts";
+import { meetExpiredOf, type MasterRow } from "./master-row.ts";
 
 /**
  * Data for the Overview hero's second and third modes (Categories analysis, Placement analysis), computed from
@@ -108,7 +108,7 @@ export function overviewModes(all: MasterRow[]): OverviewModes {
     meetings.sent += m.waiting;
     meetings.accepted += m.upcoming;
     meetings.completed += m.done;
-    meetings.expired += m.missed + m.notJoined + m.notClosed + m.notAccepted;
+    meetings.expired += meetExpiredOf(m);
     meetings.withdrawn += m.withdrawn + m.calledOff;
     if (m.total > 0) meetings.students++;
   }

@@ -27,7 +27,6 @@ test("a verified student carries every field on the master data list", () => {
   assert.equal(r.degree, "BBA");
   assert.equal(r.startYear, 2024);
   assert.equal(r.endYear, 2027);
-  assert.equal(r.semester, 5);
   assert.equal(r.professionalCourse, "CFA Level 1");
   assert.equal(r.professionalStatus, "Pursuing");
   assert.equal(r.certifications, 2);
@@ -40,7 +39,6 @@ test("a verified student carries every field on the master data list", () => {
   assert.equal(r.hasReport, true);
   assert.equal(r.city, "Jaipur, Rajasthan");
   assert.equal(cellText({ ...r, cgpa: 6 }, "cgpa"), "6.0");
-  assert.equal(cellText(r, "semester"), "5");
 });
 
 test("an unverified student shows only name, email, year, course and branch", () => {
@@ -105,9 +103,9 @@ test("open to work: the student's own switch, shown only once the officer accept
   assert.equal(buildMasterRow(student({ status: "claimed", openToWork: false }), extras()).openToWork, null);
 });
 
-test("meetings missed and offer replies show per student, deadline missed apart from rejected", () => {
+test("meetings expired and offer replies show per student, deadline missed apart from rejected", () => {
   const r = buildMasterRow(student(), extras({ offers: 5, offersAccepted: 1, offersRejected: 1, offersLapsed: 2, offersOpen: 1, meetings: { total: 3, done: 1, missed: 2, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, notClosed: 0, notJoined: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 } }));
-  assert.equal(cellText(r, "meetingsMissed"), "2");
+  assert.equal(cellText(r, "meetingsExpired"), "2");
   assert.equal(cellText(r, "offerReplies"), "1 accepted · 1 rejected · 2 deadline missed · 1 waiting");
   assert.equal(cellText(buildMasterRow(student(), extras()), "offerReplies"), "");
   assert.equal(cellText(buildMasterRow(student({ status: "claimed" }), extras({ offers: 2, offersLapsed: 2 })), "offerReplies"), "");
@@ -145,4 +143,21 @@ test("a verified student with no onboarding record still shows the phone and Lin
   assert.equal(r.phone, "+91 98290 00000");
   assert.equal(r.linkedin, "https://linkedin.com/in/asha");
   assert.equal(buildMasterRow(student({ status: "claimed" }), undefined).phone, null, "an unverified student keeps only name/email/year/course/branch");
+});
+
+// Owner, 27 Nov: Master data shows meetings expired (the dashboard's Expired: missed, not joined, not closed, not
+// accepted) instead of meetings missed, has no semester column (not collected), and shows open to work.
+test("master data: Meetings expired matches the dashboard's Expired, no semester, an Open to work column", () => {
+  const keys = MASTER_COLUMNS.map((c) => c.key as string);
+  assert.ok(!keys.includes("semester"), "no semester column");
+  assert.ok(!keys.includes("meetingsMissed"), "missed is replaced by expired");
+  assert.equal(MASTER_COLUMNS.find((c) => c.key === ("meetingsExpired"))?.label, "Meetings expired");
+  assert.equal(MASTER_COLUMNS.find((c) => c.key === "openToWork")?.label, "Open to work");
+  const meetings = { total: 9, done: 1, missed: 1, calledOff: 0, withdrawn: 0, notAccepted: 2, upcoming: 0, waiting: 0, notClosed: 3, notJoined: 1, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 };
+  const r = buildMasterRow(student({ openToWork: false }), extras({ meetings }));
+  assert.equal(cellText(r, "meetingsExpired"), "7");
+  assert.equal(matchesOutcome(r, "meet-expired"), true);
+  assert.equal(cellText(r, "openToWork"), "No");
+  assert.equal(cellText(buildMasterRow(student({ openToWork: true }), extras()), "openToWork"), "Yes");
+  assert.equal(cellText(buildMasterRow(student({ status: "claimed" }), extras()), "openToWork"), "", "nothing shown before approval");
 });

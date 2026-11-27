@@ -22,7 +22,6 @@ export type MasterRow = {
   startYear: number | null;
   endYear: number | null;
   year: number | null;
-  semester: number | null;
   linkedin: string | null;
   city: string | null;
   cgpa: number | null;
@@ -109,6 +108,8 @@ export const OUTCOMES: { key: Exclude<Outcome, "">; label: string }[] = [
 ];
 const withdrawnOf = (r: MasterRow) => r.offers - r.offersAccepted - r.offersRejected - r.offersLapsed - r.offersOpen;
 const meetOtherOf = (m: Meetings) => m.notClosed;
+/** The drive board's Expired stage (meet-outcome.ts): missed, not joined, never closed, or not accepted in time. One count for Master data and the dashboard. */
+export const meetExpiredOf = (m: Meetings) => m.missed + m.notJoined + m.notClosed + m.notAccepted;
 
 export function matchesOutcome(r: MasterRow, o: Outcome): boolean {
   switch (o) {
@@ -129,7 +130,7 @@ export function matchesOutcome(r: MasterRow, o: Outcome): boolean {
     case "meet-called-off": return r.meetings.calledOff > 0;
     case "meet-withdrawn": return r.meetings.withdrawn > 0;
     case "meet-other": return meetOtherOf(r.meetings) > 0;
-    case "meet-expired": return r.meetings.missed + r.meetings.notJoined + r.meetings.notClosed + r.meetings.notAccepted > 0;
+    case "meet-expired": return meetExpiredOf(r.meetings) > 0;
     case "meet-any-withdrawn": return r.meetings.withdrawn + r.meetings.calledOff > 0;
     case "call-took": return r.meetings.callsAccepted > 0;
     case "call-waiting": return r.meetings.callsWaiting > 0;
@@ -229,7 +230,6 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     startYear: null,
     endYear: null,
     year: s.year,
-    semester: null,
     linkedin: null,
     city: null,
     cgpa: null,
@@ -283,7 +283,6 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     emergencyContact: emergency,
     startYear: year4(a.startYear),
     endYear: year4(a.endYear ?? a.yearOfGraduation),
-    semester: num(a.currentSemester),
     linkedin: s.linkedin,
     city: [str(x.city), str(x.state)].filter(Boolean).join(", ") || null,
     cgpa: s.cgpa,
@@ -327,7 +326,7 @@ export type ColumnKind = "text" | "number" | "score" | "bool" | "list" | "date" 
 export type ColumnGroup = "Student" | "Course" | "Preferences" | "Scores" | "Placement";
 
 export type MasterColumn = {
-  key: keyof MasterRow | "report" | "recording" | "meetingsDone" | "meetingsNotAccepted" | "meetingsMissed" | "offerReplies" | "driveCalls";
+  key: keyof MasterRow | "report" | "recording" | "meetingsDone" | "meetingsNotAccepted" | "meetingsExpired" | "offerReplies" | "driveCalls";
   label: string;
   group: ColumnGroup;
   kind: ColumnKind;
@@ -344,7 +343,6 @@ export const MASTER_COLUMNS: MasterColumn[] = [
   { key: "startYear", label: "Start year", group: "Course", kind: "number" },
   { key: "endYear", label: "End year", group: "Course", kind: "number" },
   { key: "year", label: "Current year", group: "Course", kind: "number" },
-  { key: "semester", label: "Current semester", group: "Course", kind: "number" },
   { key: "linkedin", label: "LinkedIn", group: "Student", kind: "link" },
   { key: "city", label: "City", group: "Student", kind: "text" },
   { key: "cgpa", label: "CGPA", group: "Course", kind: "score" },
@@ -356,6 +354,7 @@ export const MASTER_COLUMNS: MasterColumn[] = [
   { key: "workMode", label: "Work preference", group: "Preferences", kind: "text" },
   { key: "preferredLocations", label: "Preferred locations", group: "Preferences", kind: "list" },
   { key: "laptop", label: "Laptop", group: "Preferences", kind: "bool" },
+  { key: "openToWork", label: "Open to work", group: "Preferences", kind: "bool" },
   { key: "lastSeenAt", label: "Last seen", group: "Preferences", kind: "date" },
   { key: "skills", label: "Skills", group: "Preferences", kind: "list" },
   { key: "report", label: "AI interview report", group: "Scores", kind: "link" },
@@ -371,7 +370,7 @@ export const MASTER_COLUMNS: MasterColumn[] = [
   { key: "earningsMinor", label: "Earnings", group: "Placement", kind: "money" },
   { key: "meetingsDone", label: "Meetings done", group: "Placement", kind: "number" },
   { key: "meetingsNotAccepted", label: "Meetings not accepted", group: "Placement", kind: "number" },
-  { key: "meetingsMissed", label: "Meetings missed", group: "Placement", kind: "number" },
+  { key: "meetingsExpired", label: "Meetings expired", group: "Placement", kind: "number" },
   { key: "offerReplies", label: "Offer replies", group: "Placement", kind: "text" },
   { key: "driveCalls", label: "Drive meets", group: "Placement", kind: "text" },
 ];
@@ -442,8 +441,8 @@ export function cellText(row: MasterRow, key: MasterColumn["key"], origin = ""):
       return row.verified ? String(row.meetings.done) : "";
     case "meetingsNotAccepted":
       return row.verified ? String(row.meetings.notAccepted) : "";
-    case "meetingsMissed":
-      return row.verified ? String(row.meetings.missed) : "";
+    case "meetingsExpired":
+      return row.verified ? String(meetExpiredOf(row.meetings)) : "";
     case "offerReplies":
       return row.verified ? offerReplies(row) : "";
     case "driveCalls":

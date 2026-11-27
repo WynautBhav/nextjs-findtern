@@ -10,7 +10,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { ago } from "@/lib/college/labels";
 import { HIGH_CGPA, STRONG_SCORE, inQuadrant, type Quadrant } from "@/lib/college/insights";
 import { COFFEE, MARKS, coffeeOf, marksOf, type CoffeeKey, type MarksKey } from "@/lib/college/overview-modes";
-import { MASTER_COLUMNS, OUTCOMES, cellText, matchesOutcome, matchesWorkMode, type ColumnGroup, type Outcome, type MasterColumn, type MasterRow } from "@/lib/college/master-row";
+import { MASTER_COLUMNS, OUTCOMES, cellText, matchesOutcome, meetExpiredOf, matchesWorkMode, type ColumnGroup, type Outcome, type MasterColumn, type MasterRow } from "@/lib/college/master-row";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
 import type { NudgeKind } from "@/lib/college/nudge-plan";
@@ -46,7 +46,7 @@ type SortState = { key: Key; dir: "asc" | "desc" };
 type View = { id: string; name: string; columns: Key[]; filters: Filters; sort: SortState; own?: boolean };
 
 const NO_FILTERS: Filters = { course: "", year: "", mode: "", laptop: "any", openToWork: "any", placement: "any", status: "any", minScore: "", minCgpa: "", quadrant: "", band: "", marks: "", outcome: "" };
-const BASE: Key[] = ["name", "degree", "branch", "year", "cgpa", "score", "meetingsMissed", "offers", "offerReplies", "hired", "ppo", "lastSeenAt"];
+const BASE: Key[] = ["name", "degree", "branch", "year", "cgpa", "score", "meetingsExpired", "offers", "offerReplies", "hired", "ppo", "openToWork", "lastSeenAt"];
 const SCORES: Key[] = ["name", "degree", "branch", "cgpa", "english", "coding", "aptitude", "aiInterview", "score", "offers"];
 
 const PRESETS: View[] = [
@@ -76,7 +76,7 @@ function sortValue(r: MasterRow, k: Key): string | number | null {
   if (k === "meetingsDone") return r.verified ? r.meetings.done : null;
   if (k === "meetingsNotAccepted") return r.verified ? r.meetings.notAccepted : null;
   if (k === "driveCalls") return r.verified && r.meetings.callsAccepted + r.meetings.callsNotTaken + r.meetings.callsWaiting > 0 ? r.meetings.callsAccepted * 1e6 + r.meetings.callsNotTaken * 1e3 + r.meetings.callsWaiting : null;
-  if (k === "meetingsMissed") return r.verified ? r.meetings.missed : null;
+  if (k === "meetingsExpired") return r.verified ? meetExpiredOf(r.meetings) : null;
   if (k === "offerReplies") return r.verified && r.offers > 0 ? r.offersAccepted * 1e6 + r.offersRejected * 1e3 + r.offersLapsed : null;
   const v = r[k as keyof MasterRow];
   if (v === null || v === undefined) return null;
@@ -214,7 +214,7 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
   const [viewId, setViewId] = useState(start.id);
   // A meetings drill-down from the Overview shows the meeting counts, so each row says why it is in the list.
   const [columns, setColumns] = useState<Key[]>(() =>
-    /^(met|meet-|not-accepted|call-)/.test(initial.outcome ?? "") ? ["name", "degree", "branch", "year", "meetingsDone", "meetingsNotAccepted", "meetingsMissed", "driveCalls", "score", "offers", "hired", "lastSeenAt"] : start.columns,
+    /^(met|meet-|not-accepted|call-)/.test(initial.outcome ?? "") ? ["name", "degree", "branch", "year", "meetingsDone", "meetingsNotAccepted", "meetingsExpired", "driveCalls", "score", "offers", "hired", "lastSeenAt"] : start.columns,
   );
   // Filters can arrive in the link (from the Dashboard pop-up and its tiles): only known values are taken.
   const [filters, setFilters] = useState<Filters>(() => {
@@ -274,7 +274,8 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
   const allViews = [...PRESETS, ...own];
   const apply = (v: View) => {
     setViewId(v.id);
-    setColumns(v.columns.filter((k) => MASTER_COLUMNS.some((c) => c.key === k)));
+    // Views saved before 27 Nov name "meetingsMissed": it became Meetings expired.
+    setColumns(v.columns.map((k) => ((k as string) === "meetingsMissed" ? "meetingsExpired" : k)).filter((k) => MASTER_COLUMNS.some((c) => c.key === k)));
     setFilters({ ...NO_FILTERS, ...v.filters });
     setSort(v.sort);
     setLimit(PAGE);

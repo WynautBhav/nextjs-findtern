@@ -8,7 +8,7 @@ import { matchesOutcome } from "./master-row.ts";
 let n = 0;
 const row = (over: Partial<MasterRow>): MasterRow => ({
   userId: `u${n++}`, verified: true, name: "A B", email: "a@x.test", phone: null, emergencyContact: null, degree: "BBA", branch: null,
-  startYear: null, endYear: null, year: 3, semester: null, linkedin: null, city: null, cgpa: null, professionalCourse: null,
+  startYear: null, endYear: null, year: 3, linkedin: null, city: null, cgpa: null, professionalCourse: null,
   professionalStatus: null, professionalLevel: null, certifications: null, experience: null, workMode: null, preferredLocations: [],
   laptop: null, lastSeenAt: null, skills: [], hasReport: false, hasRecording: false, english: null, coding: null, aptitude: null,
   aiInterview: null, score: null, offers: 0, offersAccepted: 0, offersRejected: 0, offersLapsed: 0, offersOpen: 0, marks10: null, hired: false, ppo: false, internship: false, ppoDirect: false, ppoAfter: false,
