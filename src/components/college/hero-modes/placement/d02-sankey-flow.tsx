@@ -3,7 +3,7 @@ import { DesignFrame, GOLD, Legend, n, OUTCOME_FILL, white } from "../kit";
 import { cn } from "@/lib/utils";
 import { Averages, BandBar, goldA, MarksBar, Meetings, onFill } from "./parts";
 import { DrillLink, type DrillFilters } from "../drill";
-import { fitColumn } from "./sankey-fit";
+import { fitColumn, MIN_NODE } from "./sankey-fit";
 
 const W = 1000;
 const H = 230;
@@ -13,7 +13,7 @@ const PAD = 5;
 const GAP = 10;
 const per = (total: number, avail: number) => (total ? avail / total : 0);
 
-type Node = { id: string; label: string; short?: string; v: number; x: number; y: number; h: number; fill: string; below?: boolean };
+type Node = { id: string; label: string; short?: string; v: number; x: number; y: number; h: number; fill: string };
 
 /** What each block opens: the students behind it. Offer blocks count offers; the pop-up lists the students holding one. */
 const DRILL: Record<string, { title: string; filters: DrillFilters }> = {
@@ -70,13 +70,14 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
   const hiredS = data.internships;
   // Internships and PPOs keep the Accepted node's scale, so a raised small node never shrinks them.
   const perOffer = o.accepted ? acc.h / o.accepted : col2.scale;
-  const intern: Node = { id: "h", label: "Internship", v: hiredS, x: X(3), y: 28, h: hiredS * perOffer, fill: GOLD, below: true };
-  // Under the internship, past its label.
-  const direct: Node = { id: "d", label: "Direct PPO", v: data.ppoDirect, x: X(3), y: intern.y + intern.h + 52, h: data.ppoDirect * perOffer, fill: GOLD, below: true };
-  const ppo: Node = { id: "p", label: "PPO after internship", v: data.ppoAfter, x: X(4), y: 62, h: data.ppoAfter * perOffer, fill: GOLD, below: true };
+  // The end blocks are always drawn, a 0 too, at least tall enough for their label (owner, 27 Nov).
+  const endH = (v: number) => Math.max(MIN_NODE, v * perOffer);
+  const intern: Node = { id: "h", label: "Internship", v: hiredS, x: X(3), y: acc.y, h: endH(hiredS), fill: GOLD };
+  const direct: Node = { id: "d", label: "Direct PPO", v: data.ppoDirect, x: X(3), y: intern.y + intern.h + GAP, h: endH(data.ppoDirect), fill: GOLD };
+  const ppo: Node = { id: "p", label: "PPO after internship", v: data.ppoAfter, x: X(4), y: intern.y, h: endH(data.ppoAfter), fill: GOLD };
   const nodes = [interviewed, offer, none, ...outs, intern, direct, ppo];
-  // A tall internship block pushes Direct PPO down: the chart grows rather than clip its label.
-  const height = Math.max(H, direct.y + direct.h + 44);
+  // A tall internship block pushes Direct PPO down: the chart grows rather than clip it.
+  const height = Math.max(H, direct.y + direct.h + PAD);
 
   // Ribbons.
   const ribbons: { d: string; fill: string }[] = [];
@@ -89,11 +90,11 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
     sy += sh;
   }
   const hSrc = Math.min(hiredS, o.accepted) * perOffer;
-  ribbons.push({ d: ribbon(acc.x + NW, acc.y, hSrc, intern.x, intern.y, intern.h), fill: goldA(0.3) });
+  if (hiredS) ribbons.push({ d: ribbon(acc.x + NW, acc.y, hSrc, intern.x, intern.y, intern.h), fill: goldA(0.3) });
   const dSrc = Math.min(data.ppoDirect, Math.max(0, o.accepted - Math.min(hiredS, o.accepted))) * perOffer;
-  ribbons.push({ d: ribbon(acc.x + NW, acc.y + hSrc, dSrc, direct.x, direct.y, direct.h), fill: goldA(0.3) });
+  if (dSrc) ribbons.push({ d: ribbon(acc.x + NW, acc.y + hSrc, dSrc, direct.x, direct.y, direct.h), fill: goldA(0.3) });
   const pSrc = Math.min(data.ppoAfter, hiredS) * perOffer;
-  ribbons.push({ d: ribbon(intern.x + NW, intern.y, pSrc, ppo.x, ppo.y, ppo.h), fill: goldA(0.3) });
+  if (pSrc) ribbons.push({ d: ribbon(intern.x + NW, intern.y, pSrc, ppo.x, ppo.y, ppo.h), fill: goldA(0.3) });
 
   return (
     <DesignFrame
@@ -112,21 +113,21 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
           ))}
         </svg>
         {nodes.map((nd) => {
-          const style = { left: `${(nd.x / W) * 100}%`, width: `${(NW / W) * 100}%`, top: `${((nd.below ? nd.y + nd.h + 4 : nd.y) / height) * 100}%`, height: nd.below ? undefined : `${(nd.h / height) * 100}%` };
-          const tight = !nd.below && nd.h < 50;
-          const txt = nd.below ? "white" : onFill(nd.fill);
+          const style = { left: `${(nd.x / W) * 100}%`, width: `${(NW / W) * 100}%`, top: `${(nd.y / height) * 100}%`, height: `${(nd.h / height) * 100}%` };
+          const tight = nd.h < 50;
+          const txt = onFill(nd.fill);
           return (
             <DrillLink
               key={nd.id}
               title={DRILL[nd.id].title}
               filters={DRILL[nd.id].filters}
               aria-label={`${nd.label}: ${nd.v}. Open in Master data`}
-              className={cn(nd.below ? "absolute rounded-sm text-center" : cn("absolute grid text-center", tight ? "place-items-center" : "place-content-center"), "outline-none ring-white/0 transition-[box-shadow] hover:ring-2 hover:ring-white/60 focus-visible:ring-2 focus-visible:ring-white", nd.h === 0 && !nd.below && "pointer-events-none")}
-              style={nd.below ? { ...style, top: `${(nd.y / height) * 100}%`, paddingTop: nd.h + 4 } : style}
+              className={cn("absolute grid text-center", tight ? "place-items-center" : "place-content-center", "outline-none ring-white/0 transition-[box-shadow] hover:ring-2 hover:ring-white/60 focus-visible:ring-2 focus-visible:ring-white", nd.h === 0 && "pointer-events-none")}
+              style={style}
             >
-              {nd.h === 0 && !nd.below ? null : (
+              {nd.h === 0 ? null : (
                 <span className={tight ? "flex items-baseline justify-center gap-1.5" : "contents"}>
-                  <span className={cn("hidden text-xs sm:block", tight && "leading-none")} style={{ color: nd.below ? "var(--color-on-dark)" : txt }}>{nd.label}</span>
+                  <span className={cn("hidden text-xs sm:block", tight && "leading-none")} style={{ color: txt }}>{nd.label}</span>
                   <span className={cn("nums font-medium", tight ? "text-sm leading-none" : "text-sm sm:text-lg")} style={{ color: txt }}>{n(nd.v)}</span>
                 </span>
               )}
