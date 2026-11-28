@@ -222,3 +222,23 @@ test("funnel: a station counts everyone who got this far, so stopped always equa
   const clean = funnel([["a", "b"], ["a"]]);
   assert.deepEqual([clean[0].reached, clean[0].skipped, clean[1].reached], [["a", "b"], [], ["a"]]);
 });
+
+test("studentMetrics: meetings split their total into completed, upcoming, waiting, expired and withdrawn", () => {
+  const meetings = [
+    meeting("m1", "a", "completed"),
+    meeting("m2", "a", "completed"),
+    meeting("m3", "a", "accepted"),
+    meeting("m4", "a", "sent"),
+    meeting("m5", "a", "expired"),
+    meeting("m6", "a", "withdrawn"),
+    meeting("m7", "nobody", "completed"), // not one of the students: left out
+  ];
+  const m = studentMetrics({ students: [student("a")], offers: [], meetings, employers: [] });
+  assert.deepEqual(m.meetsAll.ids, ["m1", "m2", "m3", "m4", "m5", "m6"]);
+  assert.deepEqual(
+    [m.meetsCompleted.ids, m.meetsUpcoming.ids, m.meetingsAwaiting.ids, m.meetsExpired.ids, m.meetsWithdrawn.ids],
+    [["m1", "m2"], ["m3"], ["m4"], ["m5"], ["m6"]],
+  );
+  const parts = [m.meetsCompleted, m.meetsUpcoming, m.meetingsAwaiting, m.meetsExpired, m.meetsWithdrawn].reduce((s, l) => s + l.ids.length, 0);
+  assert.equal(parts, m.meetsAll.ids.length);
+});

@@ -467,7 +467,7 @@ function StudentsView({ data, track, setTrack, open, links }: { data: DashboardB
           ) : null}
         </Card>
 
-        <Card title="Offers and meetings" sub="How students answered, every offer so far" className="lg:col-span-7">
+        <Card title="Offers and meetings" sub="How students answered, every offer and meeting so far" className="lg:col-span-7">
           <div className="space-y-6">
             {(
               [
@@ -497,11 +497,19 @@ function StudentsView({ data, track, setTrack, open, links }: { data: DashboardB
                 }))}
               />
             ))}
-            <Versus
+            <Breakdown
               title="Meetings"
-              note={`${fmt(n(m.meetsCompleted) + n(m.meetsExpired))} finished`}
-              left={{ label: "Completed", value: n(m.meetsCompleted), onOpen: () => open("Meetings completed" + tag, m.meetsCompleted) }}
-              right={{ label: "Expired", value: n(m.meetsExpired), onOpen: () => open("Meetings expired" + tag, m.meetsExpired), color: C_WAIT }}
+              total={n(m.meetsAll)}
+              onOpenTotal={() => open("Meetings, all" + tag, m.meetsAll)}
+              parts={(
+                [
+                  ["Completed", "completed", C_MAIN, m.meetsCompleted],
+                  ["Upcoming", "upcoming", C_SOFT, m.meetsUpcoming],
+                  ["Waiting", "awaiting reply", "var(--color-brand-200)", m.meetingsAwaiting],
+                  ["Expired", "expired", C_WAIT, m.meetsExpired],
+                  ["Withdrawn", "withdrawn", C_GREY, m.meetsWithdrawn],
+                ] as const
+              ).map(([label, word, color, list]) => ({ key: label, label, value: n(list), color, onOpen: () => open(`Meetings ${word}` + tag, list) }))}
             />
           </div>
         </Card>

@@ -165,8 +165,13 @@ export function studentMetrics(
 
     offersAwaiting: off(offers.filter((o) => o.reply === "pending")),
     meetingsAwaiting: meet(meetings.filter((m) => m.stage === "sent")),
+    // Meetings: the total splits into completed, upcoming (accepted, not yet held), waiting (meetingsAwaiting: no
+    // reply yet), expired and withdrawn.
+    meetsAll: meet(meetings),
     meetsCompleted: meet(meetings.filter((m) => m.stage === "completed")),
+    meetsUpcoming: meet(meetings.filter((m) => m.stage === "accepted")),
     meetsExpired: meet(meetings.filter((m) => m.stage === "expired")),
+    meetsWithdrawn: meet(meetings.filter((m) => m.stage === "withdrawn")),
     // Each offer type: its total, split by the student's reply (the five parts add up to the total).
     internshipAll: off(offers.filter((o) => o.track === "internship")),
     internshipAccepted: reply("internship", "accepted"),
