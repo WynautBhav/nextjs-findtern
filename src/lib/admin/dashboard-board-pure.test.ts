@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   employerMetrics,
+  initials,
+  stackOf,
   isIndianEmployer,
   offerReply,
   pct,
@@ -181,4 +183,20 @@ test("studentMetrics: each offer type splits its total into accepted, rejected, 
     const parts = (["Accepted", "Rejected", "Expired", "Withdrawn", "Waiting"] as const).reduce((s, k) => s + m[`${t}${k}`].ids.length, 0);
     assert.equal(parts, m[`${t}All`].ids.length, `${t} parts add up to the total`);
   }
+});
+
+test("initials: letters and digits only, so brackets and dots never show", () => {
+  assert.equal(initials("Acme (Test)"), "AT");
+  assert.equal(initials("Meridian Labs (old)"), "MO");
+  assert.equal(initials("(Beta) Corp"), "BC");
+  assert.equal(initials("ishita"), "I");
+  assert.equal(initials("  "), "·");
+});
+
+test("stackOf: at most 10 blocks, the 10th becomes +N when more are left", () => {
+  const ids = (k: number) => Array.from({ length: k }, (_, i) => `e${i}`);
+  assert.deepEqual(stackOf(ids(3)), { shown: ids(3), more: 0 });
+  assert.deepEqual(stackOf(ids(10)), { shown: ids(10), more: 0 });
+  assert.deepEqual(stackOf(ids(24)), { shown: ids(9), more: 15 });
+  assert.equal(stackOf(ids(24)).shown.length + 1, 10);
 });

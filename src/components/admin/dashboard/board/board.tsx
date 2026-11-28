@@ -10,6 +10,7 @@ import {
   employerMetrics,
   SIZE_UNKNOWN,
   pct,
+  stackOf,
   studentMetrics,
   trackCounts,
   type BoardLinks,
@@ -629,8 +630,7 @@ function EmployersView({ data, open }: { data: DashboardBoard; open: Open }) {
     { key: `${key}-hired`, label: "Hired", reached: n(hired), tone: "end", caption: `${pct(n(hired), n(sent)) ?? 0}% of offers`, onOpen: () => open(`Hired on ${label.toLowerCase()}`, hired) },
   ];
   // Company size as stacked companies: each block is one employer, so four companies read as four, not as a bar.
-  const maxSize = Math.max(1, ...m.sizes.map((s) => n(s.list)));
-  const blocks = maxSize <= 14;
+  // A column is at most 10 blocks tall; past that the top block says "+N" and the column (or View all) opens the rest.
 
   return (
     <div className="space-y-[var(--admin-gap)]">
@@ -653,10 +653,21 @@ function EmployersView({ data, open }: { data: DashboardBoard; open: Open }) {
       </NightPanel>
 
       <div className="grid gap-[var(--admin-gap)] lg:grid-cols-12">
-        <Card title="Company size" sub="Headcount each employer gave at signup, in people" className="lg:col-span-7">
-          <ul className="grid h-56 grid-cols-7 items-end gap-2 border-b border-[color:var(--admin-rule)] sm:gap-3">
+        <Card
+          title="Company size"
+          sub="Headcount each employer gave at signup, in people"
+          className="lg:col-span-7"
+          action={
+            <button type="button" onClick={() => open("All employers", m.signedUp)} className="inline-flex h-9 items-center rounded-full border border-ink-200 px-3.5 text-sm text-foreground transition-colors hover:border-ink-300 hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:h-11">
+              View all
+            </button>
+          }
+        >
+          <ul className="grid min-h-56 grid-cols-7 items-end gap-2 border-b border-[color:var(--admin-rule)] pt-2 sm:gap-3">
             {m.sizes.map((s) => {
               const c = n(s.list);
+              const stack = stackOf(s.list.ids);
+              const tone = { background: s.bucket === SIZE_UNKNOWN ? C_GREY : C_MAIN, color: "#fff" };
               return (
                 <li key={s.bucket} className="flex h-full min-w-0 flex-col justify-end">
                   <button
@@ -666,23 +677,24 @@ function EmployersView({ data, open }: { data: DashboardBoard; open: Open }) {
                     className="group flex h-full flex-col items-center justify-end gap-1 rounded-t-lg pb-px outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <span className="text-sm font-semibold tabular-nums text-foreground">{fmt(c)}</span>
-                    {blocks ? (
-                      <span className="flex w-full max-w-14 flex-col-reverse gap-[3px]">
-                        {s.list.ids.map((id, i) => (
-                          <span
-                            key={id}
-                            title={nameOf.get(id)}
-                            className="board-dot grid h-7 place-items-center rounded-md text-[0.625rem] font-semibold transition-transform group-hover:-translate-y-0.5"
-                            style={{ background: s.bucket === SIZE_UNKNOWN ? C_GREY : C_MAIN, color: "#fff", animationDelay: `${i * 70}ms` }}
-                          >
-                            {initials(nameOf.get(id) ?? "")}
-                          </span>
-                        ))}
-                        {c === 0 ? <span className="h-0.5 rounded-full bg-ink-200" /> : null}
-                      </span>
-                    ) : (
-                      <span className="block w-full max-w-14 rounded-t-md" style={{ height: `${(c / maxSize) * 78}%`, minHeight: c ? 6 : 2, background: c ? (s.bucket === SIZE_UNKNOWN ? C_GREY : C_MAIN) : "var(--color-ink-200)" }} />
-                    )}
+                    <span className="flex w-full max-w-14 flex-col-reverse gap-[3px]">
+                      {stack.shown.map((id, i) => (
+                        <span
+                          key={id}
+                          title={nameOf.get(id)}
+                          className="board-dot grid h-6 place-items-center rounded-md text-[0.625rem] font-semibold transition-transform group-hover:-translate-y-0.5"
+                          style={{ ...tone, animationDelay: `${i * 70}ms` }}
+                        >
+                          {initials(nameOf.get(id) ?? "")}
+                        </span>
+                      ))}
+                      {stack.more ? (
+                        <span className="board-dot grid h-6 place-items-center rounded-md border border-dashed border-ink-300 bg-background text-[0.6875rem] font-semibold tabular-nums text-foreground" style={{ animationDelay: `${stack.shown.length * 70}ms` }}>
+                          +{fmt(stack.more)}
+                        </span>
+                      ) : null}
+                      {c === 0 ? <span className="h-0.5 rounded-full bg-ink-200" /> : null}
+                    </span>
                   </button>
                 </li>
               );

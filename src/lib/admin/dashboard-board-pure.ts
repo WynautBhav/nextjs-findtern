@@ -246,3 +246,15 @@ export type EmployerMetrics = ReturnType<typeof employerMetrics>;
 export function pct(part: number, whole: number): number | null {
   return whole > 0 ? Math.round((part / whole) * 100) : null;
 }
+
+/** Two initials from a name, letters and digits only ("Acme (Test)" → "AT"), or "·" when there are none. */
+export function initials(name: string) {
+  const parts = name.split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, "")).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "·";
+}
+
+/** A stack of one block per item, at most `cap` tall: past the cap, the last block becomes "+N". */
+export function stackOf(ids: string[], cap = 10) {
+  if (ids.length <= cap) return { shown: ids, more: 0 };
+  return { shown: ids.slice(0, cap - 1), more: ids.length - (cap - 1) };
+}

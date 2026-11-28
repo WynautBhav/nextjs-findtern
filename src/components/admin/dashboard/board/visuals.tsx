@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { initials } from "@/lib/admin/dashboard-board-pure";
 import { cn } from "@/lib/utils";
 
 /**
@@ -53,10 +54,7 @@ export function tintOf(id: string) {
   return { background: `var(--admin-person-${k})`, color: `var(--admin-person-ink-${k})` };
 }
 
-export function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "·";
-}
+export { initials } from "@/lib/admin/dashboard-board-pure";
 
 export type Face = { id: string; name: string };
 
