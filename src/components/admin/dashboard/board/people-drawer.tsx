@@ -17,6 +17,10 @@ import { CountUp, FacePile, initials, tintOf } from "./visuals";
  * companies; `note` carries the offer or meeting the row is about.
  */
 
+/** Columns that hold sentences, not values: they wrap instead of cutting to one line. */
+const PROSE = new Set(["What happened", "Reason", "Feedback"]);
+const OPTIONAL = new Set(["Reason", "Feedback"]);
+
 export type DrawerRow = {
   id: string;
   /** The person or company the row opens and the actions reach. */
@@ -107,7 +111,11 @@ function DrawerBody({ spec: full, canNudge, onToast: pageToast }: { spec: Drawer
   const tabLabel = full.waitingIds ? (tab === "wait" ? "waiting here" : "reached this point") : full.sub.replace(/^[\d,]+\s/, "");
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [limit, setLimit] = useState(PAGE);
-  const columns = useMemo(() => Object.keys(full.rows[0]?.csv ?? {}), [full.rows]);
+  // Reason and Feedback only when some row has one (a completed meeting has no reason, a withdrawn one no feedback).
+  const columns = useMemo(
+    () => Object.keys(full.rows[0]?.csv ?? {}).filter((c) => !OPTIONAL.has(c) || full.rows.some((r) => r.csv[c] != null && r.csv[c] !== "")),
+    [full.rows],
+  );
   const [cols, setCols] = useState<Set<string>>(() => new Set(columns));
   const [colOpen, setColOpen] = useState(false);
   // The table and the CSV share one rule: the pinned name column, then the columns switched on, in this order.
@@ -414,8 +422,17 @@ function DrawerBody({ spec: full, canNudge, onToast: pageToast }: { spec: Drawer
                       const v = r.csv[c];
                       const empty = v == null || v === "";
                       return (
-                        <td key={c} className={cn(cell, "px-3 py-2.5 align-middle", c === "What happened" ? "min-w-[16rem] max-w-[22rem]" : "max-w-[16rem] whitespace-nowrap", empty ? "text-ink-400" : "text-foreground", typeof v === "number" && "tabular-nums")}>
-                          {c === "Last seen" && v === "Online now" ? <span className="font-medium text-brand-700">Online now</span> : empty ? "—" : <span className={c === "What happened" ? "line-clamp-2" : "block truncate"}>{String(v)}</span>}
+                        <td key={c} className={cn(cell, "px-3 py-2.5 align-middle", PROSE.has(c) ? "min-w-[16rem] max-w-[22rem]" : "max-w-[16rem] whitespace-nowrap", empty ? "text-ink-400" : "text-foreground", typeof v === "number" && "tabular-nums")}>
+                          {c === "Last seen" && v === "Online now" ? (
+                            <span className="font-medium text-brand-700">Online now</span>
+                          ) : empty ? (
+                            "—"
+                          ) : PROSE.has(c) ? (
+                            // Sentences wrap to three lines; the whole text (feedback can be long) is in the tooltip and the CSV.
+                            <span className={cn("whitespace-pre-line", c === "What happened" ? "line-clamp-2" : "line-clamp-3")} title={String(v)}>{String(v)}</span>
+                          ) : (
+                            <span className="block truncate">{String(v)}</span>
+                          )}
                         </td>
                       );
                     })}

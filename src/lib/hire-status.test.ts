@@ -9,3 +9,8 @@ test("a proposal is a hire by status or by hiredAt", () => {
   assert.equal(isHiredProposal({ status: "accepted", hiredAt: null }), false);
   assert.equal(isHiredProposal({ status: "sent" }), false);
 });
+
+test("a finished internship is still a hire, even with no hiredAt (college master data counts it)", () => {
+  assert.equal(isHiredProposal({ status: "completed", hiredAt: null }), true);
+  assert.equal(isHiredProposal({ status: "COMPLETED" }), true);
+});

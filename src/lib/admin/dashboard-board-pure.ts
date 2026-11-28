@@ -4,6 +4,11 @@
  * opens.
  */
 
+import { isHiredProposal } from "../hire-status.ts";
+import { feedbackTextOf } from "../interview-feedback.ts";
+import { effectiveProposalStatus, type ExpiryInput } from "../proposal-expiry.ts";
+import { proposalOutcome } from "../proposals.ts";
+
 export type BoardView = "students" | "employers" | "colleges";
 export const BOARD_VIEWS: { key: BoardView; label: string }[] = [
   { key: "students", label: "Students" },
@@ -40,8 +45,8 @@ export type BoardStudent = {
   pendingPayment: boolean;
   cgpaPending: boolean;
   openToWork: boolean;
-  /** A current college membership (any status): the student is on a college's list. */
-  collegeLinked: boolean;
+  /** What the student chose on the profile (intern-account.ts getAccountType); null = never chose (older accounts). */
+  accountType: "college" | "individual" | null;
   membership: string | null;
   /** Only for students who took the AI interview; null before. */
   guarantee: Guarantee | null;
@@ -57,11 +62,30 @@ export type BoardOffer = {
   status: string;
   reply: OfferReply;
   hired: boolean;
+  /** A full-time offer made after an internship with the same company (offerDetails.fullTimeOffer.baseProposalId). */
+  ppo: boolean;
   roleTitle: string | null;
   createdAt: string | null;
 };
 
-export type BoardMeeting = { id: string; internId: string; employerId: string; employer: string; stage: MeetStage; startsAt: string | null };
+export type BoardMeeting = {
+  id: string; internId: string; employerId: string; employer: string; stage: MeetStage; startsAt: string | null;
+  /** Withdrawn only: who withdrew it and why. Completed only: the employer's written feedback. */
+  reason: string | null; feedback: string | null;
+};
+
+const BY: Record<string, string> = { employer: "the employer", intern: "the student", admin: "Findtern" };
+
+/** What a meeting's row says beyond its stage (admin only; the feedback is the text the employer wrote, interview-feedback.ts). */
+export function meetingDetail(m: { stage: MeetStage; cancelledBy: string | null; cancelReason: string | null; notes: string | null }): { reason: string | null; feedback: string | null } {
+  if (m.stage === "withdrawn") {
+    const by = m.cancelledBy && BY[m.cancelledBy] ? ` by ${BY[m.cancelledBy]}` : "";
+    const why = (m.cancelReason ?? "").trim();
+    return { reason: `Withdrawn${by}${why ? `: ${why}` : ", no reason given"}`, feedback: null };
+  }
+  if (m.stage === "completed") return { reason: null, feedback: feedbackTextOf(m.notes) || "No feedback written" };
+  return { reason: null, feedback: null };
+}
 
 export type BoardEmployer = {
   id: string;
@@ -103,13 +127,20 @@ export function isIndianEmployer(country: string | null | undefined, countryCode
  * Proposal status → the student's reply. Accepted covers every status after a yes: accepted, processing (the employer's
  * payment is under way), hired and completed (the internship ran its course). Only sent and interview_scheduled wait.
  */
-const AFTER_YES = new Set(["accepted", "processing", "hired", "completed"]);
 export function offerReply(status: string, hired: boolean): OfferReply {
-  if (hired || AFTER_YES.has(status)) return "accepted";
+  if (hired || proposalOutcome(status) === "won") return "accepted";
   if (status === "rejected") return "rejected";
   if (status === "expired") return "expired";
   if (status === "withdrawn") return "withdrawn";
   return "pending"; // sent, interview_scheduled
+}
+
+/**
+ * The reply as every screen shows it: an offer the clock has expired (unanswered or unpaid past its start day) reads
+ * expired even before the sweeper stores it, the same rule as the Proposal pipeline and Reports (effectiveProposalStatus).
+ */
+export function offerReplyOf(p: ExpiryInput & { status: string }, now: Date = new Date()): OfferReply {
+  return offerReply(effectiveProposalStatus(p, now), isHiredProposal(p));
 }
 
 /** The company-size choices employers pick from (schema `companySizes`), plus not given. */
@@ -144,6 +175,7 @@ export function studentMetrics(
   const hiredBy = (t: BoardOffer["track"]) => hired.filter((s) => hiredOffer.get(s.id)!.track === t);
   const withOffer = new Set(offers.map((o) => o.internId));
   const scored = students.filter((s) => s.aiStatus === "completed");
+  const placements = offers.filter((o) => o.hired);
   const reply = (t: BoardOffer["track"], r: OfferReply) => off(offers.filter((o) => o.track === t && o.reply === r));
 
   return {
@@ -160,8 +192,16 @@ export function studentMetrics(
     openToWork: stu(students.filter((s) => s.openToWork)),
     hidden: stu(students.filter((s) => !s.openToWork)),
     onlineNow: stu(students.filter((s) => s.online)),
-    collegeLinked: stu(students.filter((s) => s.collegeLinked)),
-    individual: stu(students.filter((s) => !s.collegeLinked)),
+    accountCollege: stu(students.filter((s) => s.accountType === "college")),
+    accountIndividual: stu(students.filter((s) => s.accountType === "individual")),
+    accountUnset: stu(students.filter((s) => s.accountType === null)),
+
+    // Every hire (a placement, so a student with an internship and then a PPO counts twice): the four parts add up.
+    placeAll: off(placements),
+    placeInternRunning: off(placements.filter((o) => o.track === "internship" && o.status !== "completed")),
+    placeInternCompleted: off(placements.filter((o) => o.track === "internship" && o.status === "completed")),
+    placeFullTime: off(placements.filter((o) => o.track === "full_time" && !o.ppo)),
+    placePpo: off(placements.filter((o) => o.track === "full_time" && o.ppo)),
 
     offersAwaiting: off(offers.filter((o) => o.reply === "pending")),
     meetingsAwaiting: meet(meetings.filter((m) => m.stage === "sent")),

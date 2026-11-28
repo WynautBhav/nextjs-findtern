@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  canTransition, normalizeStatus, isVisibleToInterns, isEditableByEmployer,
+  canTransition, normalizeStatus, isVisibleToInterns, isOpenProject, isEditableByEmployer,
   submitReadiness, MAX_SKILLS_PER_PROJECT, EDITABLE_WHILE_PUBLISHED, PROJECT_FIELD_LABELS, isLockedWhilePublished, publishedLockedMessage,
 } from "./lifecycle.ts";
 
@@ -80,4 +80,13 @@ test("published-lock message uses plain words, never column names", () => {
   for (const k of EDITABLE_WHILE_PUBLISHED) {
     if (k !== "preferredLocations") assert.ok(PROJECT_FIELD_LABELS[k], k);
   }
+});
+
+test("isOpenProject: live to candidates = published (legacy active or blank, any case) and not taken down", () => {
+  assert.equal(isOpenProject({ status: "published", takenDownAt: null }), true);
+  assert.equal(isOpenProject({ status: " Active ", takenDownAt: null }), true);
+  assert.equal(isOpenProject({ status: null, takenDownAt: null }), true);
+  assert.equal(isOpenProject({ status: "published", takenDownAt: new Date() }), false); // the Projects page leaves these out
+  assert.equal(isOpenProject({ status: "paused", takenDownAt: null }), false);
+  assert.equal(isOpenProject({ status: "draft", takenDownAt: null }), false);
 });

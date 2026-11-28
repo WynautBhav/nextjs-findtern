@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { realEmployerId } from "@/lib/admin/scope";
+import { hiredWhere, realEmployerId } from "@/lib/admin/scope";
 import { funnelSteps, type FunnelStage } from "@/lib/admin/dashboard";
 
 /**
@@ -42,8 +42,8 @@ export async function hiringFunnel(since: Date | null, until: Date | null): Prom
          WHERE ${win(sql`created_at`)} AND ${realEmployerId(sql`employer_id`)}
            AND lower(status) <> 'draft'
         UNION ALL
-        SELECT intern_id, 5 FROM ${schema.proposals}
-         WHERE lower(status) = 'hired' AND ${win(sql`coalesce(hired_at, updated_at)`)}
+        SELECT intern_id, 5 FROM ${schema.proposals} hp
+         WHERE ${hiredWhere("hp")} AND ${win(sql`coalesce(hired_at, updated_at)`)}
            AND ${realEmployerId(sql`employer_id`)}
       )
       SELECT s AS stage, count(*)::int AS value

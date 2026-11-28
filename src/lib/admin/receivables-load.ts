@@ -1,5 +1,6 @@
-import { eq, inArray, sql, type SQL } from "drizzle-orm";
+import { eq, inArray, or, sql, type SQL } from "drizzle-orm";
 
+import { hiredProposalSql } from "@/lib/employer-visibility";
 import { getDb, schema } from "@/lib/db";
 import { WAIVER_GATEWAY } from "@/lib/full-waiver";
 import { getInternActivationFeeMinor, getPerHireFeeSetting } from "@/lib/platform-settings";
@@ -49,7 +50,9 @@ export async function loadReceivables(
         hiredAt: schema.proposals.hiredAt,
       })
       .from(schema.proposals)
-      .where(inArray(schema.proposals.status, ["accepted", "processing", "hired"])),
+      // Accepted or being paid (money due from the company), or a hire of any kind, completed included: stipendDues reads
+      // hires with isHiredProposal, so a finished internship with unpaid months is still owed (as on the Payouts page).
+      .where(or(inArray(schema.proposals.status, ["accepted", "processing"]), hiredProposalSql())),
     db
       .select({
         id: schema.employerPayments.id,

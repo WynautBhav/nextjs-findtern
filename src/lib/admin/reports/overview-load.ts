@@ -1,3 +1,4 @@
+import { loadCompleteProfileIds } from "@/lib/admin/profile-state-load";
 import { sql, type SQL } from "drizzle-orm";
 import { isNewestOnboarding } from "@/lib/onboarding-newest";
 
@@ -76,11 +77,12 @@ export type Cohorts = {
 /** People who signed up in the window and what they have done since (each counted on its own). */
 export async function loadCohorts(w: ReportWindow): Promise<Cohorts> {
   const db = getDb();
+  const complete = await loadCompleteProfileIds();
   const emp = sql`${realEmployers()} AND ${rangeSql(sql`${E.createdAt}`, w.since, w.until)}`;
   const [i, e] = await Promise.all([
     timed("overview", "intern-cohort", () =>
       db
-        .execute(sql`WITH ${baseCte()} SELECT count(*)::int AS signups, count(*) FILTER (WHERE complete)::int AS complete, count(*) FILTER (WHERE applied)::int AS applied,
+        .execute(sql`WITH ${baseCte(complete)} SELECT count(*)::int AS signups, count(*) FILTER (WHERE complete)::int AS complete, count(*) FILTER (WHERE applied)::int AS applied,
             count(*) FILTER (WHERE hired)::int AS hired, count(*) FILTER (WHERE ${paidFeeSql(sql`id`)})::int AS paid,
             count(*) FILTER (WHERE paid AND NOT ${paidFeeSql(sql`id`)})::int AS free
           FROM base WHERE ${rangeSql(sql`created_at`, w.since, w.until)}`)

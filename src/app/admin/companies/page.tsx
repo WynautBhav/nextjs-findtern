@@ -1,5 +1,5 @@
 import { activeAccountSql } from "@/lib/admin/account-views";
-import { and, asc, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import { Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
@@ -8,7 +8,8 @@ import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { companyMoney } from "@/lib/admin/company-money";
 import { flattenParams, parsePageRequest, searchAny, toPage, toQueryString } from "@/lib/admin/params";
 import { revenueAmountSql } from "@/lib/admin/revenue";
-import { activeProject, inrMinorSql, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { hiredWhere, openProject, inrMinorSql, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { hiredProposalSql } from "@/lib/employer-visibility";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
@@ -32,7 +33,7 @@ const SORTS = ["name", "joined", "country", "projects", "proposals", "hires", "p
 
 const projectCount = sql<number>`(select count(*)::int from ${schema.projects} p where p.employer_id = ${q(schema.employers, schema.employers.id)})`;
 const proposalCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.employer_id = ${q(schema.employers, schema.employers.id)})`;
-const hireCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.employer_id = ${q(schema.employers, schema.employers.id)} and p.status = 'hired')`;
+const hireCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.employer_id = ${q(schema.employers, schema.employers.id)} and ${hiredWhere("p")})`;
 const paidTotal = sql<number>`(select coalesce(sum(${inrMinorSql(revenueAmountSql(sql`ep.amount_minor`, sql`ep.raw`), sql`ep.currency`)}), 0)::bigint from ${schema.employerPayments} ep where ep.employer_id = ${q(schema.employers, schema.employers.id)} and ep.status in ('paid','refunded','partially_refunded'))`;
 
 export default async function AdminCompaniesPage({
@@ -117,11 +118,11 @@ export default async function AdminCompaniesPage({
       db.select({ c: count() }).from(schema.employers).where(where),
       db.select({ c: count() }).from(schema.employers).where(realEmployers()),
       db.select({ c: count() }).from(schema.employers).where(and(realEmployers(), eq(schema.employers.onboardingCompleted, true))),
-      db.select({ c: count() }).from(schema.projects).where(and(activeProject(), realEmployerId(schema.projects.employerId))),
+      db.select({ c: count() }).from(schema.projects).where(and(openProject(), realEmployerId(schema.projects.employerId))),
       db
         .select({ c: sql<number>`count(distinct ${schema.proposals.employerId})` })
         .from(schema.proposals)
-        .where(and(eq(schema.proposals.status, "hired"), realEmployerId(schema.proposals.employerId))),
+        .where(and(hiredProposalSql(), realEmployerId(schema.proposals.employerId))),
     ]);
 
     // Money columns for this page only: what each company still owes and when.
@@ -139,7 +140,7 @@ export default async function AdminCompaniesPage({
               hiredAt: schema.proposals.hiredAt,
             })
             .from(schema.proposals)
-            .where(and(inArray(schema.proposals.employerId, pageIds), inArray(schema.proposals.status, ["accepted", "processing", "hired"]))),
+            .where(and(inArray(schema.proposals.employerId, pageIds), or(inArray(schema.proposals.status, ["accepted", "processing"]), hiredProposalSql()))),
           db
             .select({
               employerId: schema.employerPayments.employerId,

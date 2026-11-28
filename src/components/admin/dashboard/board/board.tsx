@@ -128,11 +128,13 @@ export function DashboardBoardView({
         href: links.interns ? `/admin/interns/${encodeURIComponent(s.id)}` : null,
         what: whatOf(s, offersBy.get(s.id) ?? [], meetsBy.get(s.id) ?? []),
         seen: seenOf(s, now),
+        // A list of offers or meetings leads with what the row is about (the offer, or the meeting with its reason or
+        // feedback), right after the name; the student's own columns follow.
         csv: {
-          Name: s.name, "What happened": whatOf(s, offersBy.get(s.id) ?? [], meetsBy.get(s.id) ?? []), "Last seen": seenOf(s, now), Email: s.email, Phone: s.phone, College: s.college ?? "Individual", Year: s.year, Branch: s.branch,
+          Name: s.name, ...csv, "What happened": whatOf(s, offersBy.get(s.id) ?? [], meetsBy.get(s.id) ?? []), "Last seen": seenOf(s, now), Email: s.email, Phone: s.phone, College: s.college ?? "Individual", Year: s.year, Branch: s.branch,
           "Tech / non-tech": s.track === "tech" ? "Tech" : s.track === "non_tech" ? "Non-tech" : "Not interviewed yet",
           "Profile %": s.profilePct, "AI interview": AI_LABEL[s.aiStatus] ?? s.aiStatus, "Findtern Score": s.score,
-          "Open to work": s.openToWork ? "Yes" : "No", ...csv,
+          "Open to work": s.openToWork ? "Yes" : "No",
         },
         ...extra,
       });
@@ -152,7 +154,7 @@ export function DashboardBoardView({
           const m = meetIx.get(id);
           const s = m && ix.get(m.internId);
           if (!m || !s) return [];
-          return [studentRow(s, m.id, { note: `${m.employer} · ${dateOf(m.startsAt)}`, chip: { label: STAGE_LABEL[m.stage], tone: m.stage === "completed" ? "good" : m.stage === "sent" ? "wait" : "plain" } }, { Employer: m.employer, Meeting: STAGE_LABEL[m.stage], "Meeting date": dateOf(m.startsAt) })];
+          return [studentRow(s, m.id, { note: `${m.employer} · ${dateOf(m.startsAt)}`, chip: { label: STAGE_LABEL[m.stage], tone: m.stage === "completed" ? "good" : m.stage === "sent" ? "wait" : "plain" } }, { Employer: m.employer, Meeting: STAGE_LABEL[m.stage], "Meeting date": dateOf(m.startsAt), Reason: m.reason, Feedback: m.feedback })];
         });
       else {
         kind = "employers";
@@ -343,7 +345,7 @@ function StudentsView({ data, track, setTrack, open, links }: { data: DashboardB
   const counts = useMemo(() => trackCounts(data.students), [data.students]);
   const nameOf = useMemo(() => new Map(data.students.map((s) => [s.id, s.name])), [data.students]);
   const internOf = useMemo(() => new Map([...data.offers.map((o) => [o.id, o.internId] as const), ...data.meetings.map((x) => [x.id, x.internId] as const)]), [data.offers, data.meetings]);
-  const [profileView, setProfileView] = useState<"work" | "college">("work");
+  const [profileView, setProfileView] = useState<"work" | "account">("work");
   const n = (l: MetricList) => l.ids.length;
   /** Faces for a list: the students behind it, once each. */
   const faces = (l: MetricList, max = 8): Face[] => {
@@ -516,14 +518,14 @@ function StudentsView({ data, track, setTrack, open, links }: { data: DashboardB
 
         <Card
           title="Every student, one dot each"
-          sub={profileView === "work" ? "Who employers can find" : "Joined through a college, or on their own"}
+          sub={profileView === "work" ? "Who employers can find" : "What each student chose on their profile"}
           className="lg:col-span-7"
           action={
             <div role="group" aria-label="Colour the dots by" className="inline-flex rounded-full bg-[color:var(--admin-panel-2)] p-0.5">
               {(
                 [
                   ["work", "Open to work"],
-                  ["college", "College"],
+                  ["account", "Account type"],
                 ] as const
               ).map(([k, l]) => (
                 <button
@@ -550,11 +552,12 @@ function StudentsView({ data, track, setTrack, open, links }: { data: DashboardB
             />
           ) : (
             <DotField
-              key="college"
-              label="Students by college or individual"
+              key="account"
+              label="Students by account type"
               groups={[
-                { key: "c", label: "College-associated", ids: m.collegeLinked.ids, color: C_MAIN, onOpen: () => open("College-associated students" + tag, m.collegeLinked) },
-                { key: "i", label: "Individual", ids: m.individual.ids, color: C_WAIT, onOpen: () => open("Individual accounts" + tag, m.individual) },
+                { key: "c", label: "College account", ids: m.accountCollege.ids, color: C_MAIN, onOpen: () => open("College accounts" + tag, m.accountCollege) },
+                { key: "i", label: "Individual account", ids: m.accountIndividual.ids, color: C_WAIT, onOpen: () => open("Individual accounts" + tag, m.accountIndividual) },
+                { key: "u", label: "Not chosen yet", ids: m.accountUnset.ids, color: C_GREY, onOpen: () => open("Account type not chosen" + tag, m.accountUnset) },
               ]}
             />
           )}
@@ -565,6 +568,17 @@ function StudentsView({ data, track, setTrack, open, links }: { data: DashboardB
             <FacePile faces={faces(m.hired, 8)} total={n(m.hired)} max={8} onOpen={() => open("Hired" + tag, m.hired)} label={`See all ${fmt(n(m.hired))} hired`} />
           </div>
           <div className="space-y-6">
+            <Breakdown
+              title="Placements"
+              total={n(m.placeAll)}
+              onOpenTotal={() => open("Placements, all" + tag, m.placeAll)}
+              parts={[
+                { key: "run", label: "Internship, running", value: n(m.placeInternRunning), color: C_MAIN, onOpen: () => open("Internships running" + tag, m.placeInternRunning) },
+                { key: "done", label: "Internship, completed", value: n(m.placeInternCompleted), color: C_SOFT, onOpen: () => open("Internships completed" + tag, m.placeInternCompleted) },
+                { key: "ft", label: "Full-time", value: n(m.placeFullTime), color: C_WAIT, onOpen: () => open("Full-time hires" + tag, m.placeFullTime) },
+                { key: "ppo", label: "PPO", value: n(m.placePpo), color: C_INK, onOpen: () => open("PPOs, full-time after an internship" + tag, m.placePpo) },
+              ]}
+            />
             <Versus
               title="Where they work"
               left={{ label: "Indian companies", value: n(m.workIndia), onOpen: () => open("Working for Indian companies" + tag, m.workIndia) }}

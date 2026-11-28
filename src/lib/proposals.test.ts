@@ -23,3 +23,9 @@ test("acceptance rate is over decided proposals only", () => {
   assert.equal(acceptanceRate(3, 1), 75);
   assert.equal(acceptanceRate(1, 2), 33);
 });
+
+test("an offer the student said yes to stays a win while it is paid for and after it ends", () => {
+  // processing = the employer is paying; completed = the internship finished. The dashboard already counts both as yes.
+  assert.equal(proposalOutcome("processing"), "won");
+  assert.equal(proposalOutcome("completed"), "won");
+});

@@ -4,7 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { parseOffer } from "@/lib/offer";
 import { revenueAmountSql } from "@/lib/admin/revenue";
-import { inrMinorSql, realEmployers, toInrMinor } from "@/lib/admin/scope";
+import { hiredWhere, inrMinorSql, realEmployers, toInrMinor, wonWhere } from "@/lib/admin/scope";
 
 import { companyProposalBuckets, COMPANY_PAGE_SIZE, lifecycleCounts, type CompanyFilter, type LifecycleCounts, type ProposalBuckets } from "./employers";
 import { escapeLike } from "./interns";
@@ -154,12 +154,12 @@ export async function loadCompanies(f: CompanyFilter, w: ReportWindow, opts: { l
       FROM ${P} GROUP BY employer_id) pr ON pr.employer_id = employers.id
     LEFT JOIN (SELECT employer_id,
         count(*) FILTER (WHERE lower(status) <> 'draft' AND ${win("created_at")}) AS sent,
-        count(*) FILTER (WHERE lower(status) IN ('accepted', 'hired') AND ${win("created_at")}) AS accepted,
+        count(*) FILTER (WHERE ${wonWhere("proposals")} AND ${win("created_at")}) AS accepted,
         count(*) FILTER (WHERE lower(status) = 'rejected' AND ${win("created_at")}) AS rejected,
         count(*) FILTER (WHERE lower(status) IN ('sent', 'interview_scheduled') AND ${win("created_at")}) AS pending,
         count(*) FILTER (WHERE lower(status) = 'expired' AND ${win("created_at")}) AS expired,
         count(*) FILTER (WHERE lower(status) = 'withdrawn' AND ${win("created_at")}) AS withdrawn,
-        count(*) FILTER (WHERE hired_at IS NOT NULL AND ${win("hired_at")}) AS hires
+        count(*) FILTER (WHERE ${hiredWhere("proposals")} AND ${win("coalesce(hired_at, updated_at)")}) AS hires
       FROM ${schema.proposals} GROUP BY employer_id) pp ON pp.employer_id = employers.id
     LEFT JOIN (SELECT employer_id, count(*) AS n FROM ${schema.interviews} WHERE ${win("created_at")} GROUP BY employer_id) iv ON iv.employer_id = employers.id
     LEFT JOIN (SELECT employer_id, sum(${inrMinorSql(revenueAmountSql(sql`amount_minor`, sql`raw`), sql`currency`)})::bigint AS paid_minor,

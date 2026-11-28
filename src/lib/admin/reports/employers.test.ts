@@ -40,8 +40,11 @@ test("companyProposalBuckets: sent excludes drafts; accepted includes hired; pen
     { status: "rejected", n: 5 },
     { status: "expired", n: 2 },
     { status: "withdrawn", n: 1 },
+    // Still a yes (lib/proposals proposalOutcome): the employer is paying, or the internship has finished.
+    { status: "processing", n: 2 },
+    { status: "completed", n: 1 },
   ]);
-  assert.deepEqual(b, { sent: 18, accepted: 4, rejected: 5, pending: 6, expired: 2, withdrawn: 1 });
+  assert.deepEqual(b, { sent: 21, accepted: 7, rejected: 5, pending: 6, expired: 2, withdrawn: 1 });
   assert.equal(b.sent, b.accepted + b.rejected + b.pending + b.expired + b.withdrawn);
 });
 

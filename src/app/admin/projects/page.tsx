@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { and, asc, count, desc, eq, isNull, not, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, not, sql, type SQL } from "drizzle-orm";
 import { Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { formatDate, formatNumber } from "@/lib/format";
 import { flattenParams, parsePageRequest, searchAny, toPage, toQueryString } from "@/lib/admin/params";
-import { activeProject, realEmployerId } from "@/lib/admin/scope";
+import { openProject, realEmployerId } from "@/lib/admin/scope";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
@@ -24,7 +24,6 @@ import { TakedownAction } from "./takedown-action";
 const SORTS = ["name", "company", "proposals", "posted"] as const;
 
 /** Open to candidates: a live posting that has not been taken down (a taken-down project keeps its old status). */
-const openProject = (): SQL => sql`(${activeProject()} AND ${isNull(schema.projects.takenDownAt)})`;
 
 const proposalCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.project_id = ${q(schema.projects, schema.projects.id)})`;
 

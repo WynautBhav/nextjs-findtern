@@ -14,8 +14,8 @@ test("rates, funnel and INR revenue from a small dataset", () => {
       { id: "i2", firstName: "Ravi", lastName: "M", createdAt: d("2026-02-05") },
     ],
     onboarding: [
-      { userId: "i1", createdAt: d("2026-01-05"), meaningful: true, feePaid: true, score: 7 },
-      { userId: "i2", createdAt: d("2026-02-05"), meaningful: false, feePaid: false, score: null },
+      { userId: "i1", createdAt: d("2026-01-05"), complete: true, feePaid: true, score: 7 },
+      { userId: "i2", createdAt: d("2026-02-05"), complete: false, feePaid: false, score: null },
     ],
     employers: [{ id: "e1", companyName: "Acme", createdAt: d("2026-01-02") }],
     projects: [{ id: "p1", employerId: "e1", status: "active", skills: ["React", "Node"], city: "Jaipur", state: "Rajasthan", createdAt: d("2026-01-03") }],
@@ -129,10 +129,12 @@ test("application status buckets follow legacy's seven groups, all time, largest
     { name: "Sent", value: 2 },
     { name: "Under Review", value: 2 },
     { name: "Interviewed", value: 2 },
-    { name: "Hired (Internship)", value: 2 },
+    // Only a paid hire is Hired (lib/hire-status, as on every other screen); an accepted, unpaid offer is apart.
+    { name: "Hired (Internship)", value: 1 },
     { name: "Hired (Full-time)", value: 1 },
+    { name: "Accepted, not paid", value: 1 },
     { name: "Rejected", value: 1 },
-    { name: "Withdrawn", value: 1 },
+    { name: "Expired", value: 1 },
   ]);
 });
 
@@ -142,10 +144,10 @@ test("the monthly trend also counts new interns and new companies (legacy growth
     until: d("2026-03-01"),
     interns: [],
     onboarding: [
-      { userId: "a", createdAt: d("2026-01-05"), meaningful: true, feePaid: false, score: null },
-      { userId: "b", createdAt: d("2026-01-25"), meaningful: false, feePaid: false, score: null },
-      { userId: "c", createdAt: d("2026-02-02"), meaningful: false, feePaid: false, score: null },
-      { userId: "old", createdAt: d("2025-12-31"), meaningful: false, feePaid: false, score: null },
+      { userId: "a", createdAt: d("2026-01-05"), complete: true, feePaid: false, score: null },
+      { userId: "b", createdAt: d("2026-01-25"), complete: false, feePaid: false, score: null },
+      { userId: "c", createdAt: d("2026-02-02"), complete: false, feePaid: false, score: null },
+      { userId: "old", createdAt: d("2025-12-31"), complete: false, feePaid: false, score: null },
     ],
     employers: [
       { id: "e1", companyName: "Acme", createdAt: d("2026-02-10") },
@@ -193,7 +195,7 @@ test("drafts are not offers sent: they leave the totals, rates, trend, company c
     since: d("2026-01-01"),
     until: d("2026-04-01"),
     interns: [],
-    onboarding: [{ userId: "i1", createdAt: d("2026-01-05"), meaningful: true, feePaid: false, score: null }],
+    onboarding: [{ userId: "i1", createdAt: d("2026-01-05"), complete: true, feePaid: false, score: null }],
     employers: [{ id: "e1", companyName: "Acme", createdAt: d("2025-01-02") }],
     projects: [],
     interviews: [],
@@ -261,4 +263,37 @@ test("a hire is a hire date or hired/completed, never a bare accepted offer; a l
   assert.equal(a.totals.hires, 1);
   assert.equal(a.totals.pendingProposals, 1);
   assert.deepEqual(a.topInterns.map((i) => [i.id, i.status]).sort(), [["i1", "applied"], ["i2", "placed"], ["i3", "applied"], ["i4", "applied"]]);
+});
+
+test("signups are interns whose account was made in the range (as Overview's New interns), and complete uses the admin rule", () => {
+  const input: AnalyticsInput = {
+    since: d("2026-03-01"),
+    until: d("2026-04-01"),
+    interns: [
+      { id: "old", firstName: "A", lastName: "B", createdAt: d("2026-01-05") }, // account before the range
+      { id: "new", firstName: "C", lastName: "D", createdAt: d("2026-03-05") },
+    ],
+    onboarding: [
+      { userId: "old", createdAt: d("2026-03-10"), complete: true, feePaid: true, score: null }, // profile row touched in range
+      { userId: "new", createdAt: d("2026-03-06"), complete: false, feePaid: false, score: null },
+    ],
+    employers: [], projects: [], proposals: [], interviews: [], employerPayments: [], internPayments: [],
+  };
+  const a = computeAnalytics(input);
+  assert.equal(a.totals.signups, 1);
+  assert.equal(a.funnel[1].value, 0); // "new" has not finished the profile
+});
+
+test("revenue counts a refunded or partly refunded order gross, as Collected does everywhere else", () => {
+  const input: AnalyticsInput = {
+    since: d("2026-01-01"), until: d("2026-04-01"), interns: [], onboarding: [], employers: [], projects: [], proposals: [], interviews: [],
+    employerPayments: [
+      { amountMinor: 100_000, currency: "INR", status: "paid", paidAt: d("2026-02-01"), createdAt: null },
+      { amountMinor: 50_000, currency: "INR", status: "partially_refunded", paidAt: d("2026-02-02"), createdAt: null },
+      { amountMinor: 20_000, currency: "INR", status: "refunded", paidAt: d("2026-02-03"), createdAt: null },
+      { amountMinor: 9_000, currency: "INR", status: "failed", paidAt: null, createdAt: d("2026-02-04") },
+    ],
+    internPayments: [],
+  };
+  assert.equal(computeAnalytics(input).totals.revenueMinor, 170_000);
 });

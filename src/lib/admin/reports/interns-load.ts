@@ -3,7 +3,8 @@ import { sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { activeAccountSql } from "@/lib/admin/account-views";
 import { feePaidSql } from "@/lib/fee-paid-sql";
-import { findternScoreSql, meaningfulProfile, realEmployerId } from "@/lib/admin/scope";
+import { findternScoreSql, hiredWhere, idIn, realEmployerId } from "@/lib/admin/scope";
+import { loadCompleteProfileIds } from "@/lib/admin/profile-state-load";
 
 import { cityPatterns, mergeCityRows, type MergedCity } from "./city";
 import { escapeLike, INTERN_PAGE_SIZE, type InternFilter } from "./interns";
@@ -37,7 +38,8 @@ function academic(k: "institution" | "degree" | "year"): SQL {
 }
 
 /** One row per intern with every flag the tab needs. Reused by the summary, the table and the CSV. */
-export function baseCte(): SQL {
+/** `complete` = the admin's complete-profile set (loadCompleteProfileIds), as on the Interns page and the Dashboard. */
+export function baseCte(complete: ReadonlySet<string>): SQL {
   return sql`base AS (
     SELECT ${U.id} AS id, ${U.firstName} AS first_name, ${U.lastName} AS last_name, ${U.email} AS email, ${U.createdAt} AS created_at,
       ${activeAccountSql(U.isActive)} AS is_active, ${U.bannedAt} AS banned_at, ${U.profileVisibility} AS visibility, ${U.emailVerified} AS email_verified,
@@ -45,11 +47,11 @@ export function baseCte(): SQL {
       ${academic("institution")} AS college, ${academic("degree")} AS degree, ${academic("year")} AS grad_year,
       coalesce(${O.skills}, '[]'::jsonb) AS skills,
       (${O.id} IS NOT NULL) AS started,
-      ${meaningfulProfile()} AS complete,
+      ${idIn(U.id, complete)} AS complete,
       ${feePaidSql(sql`${U.id}`, sql`${O.extraData}`)} AS paid,
       ${findternScoreSql()} AS score,
       EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.intern_id = ${U.id} AND lower(p.status) <> 'draft' AND ${realEmployerId(sql`p.employer_id`)}) AS applied,
-      EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.intern_id = ${U.id} AND (lower(p.status) = 'hired' OR p.hired_at IS NOT NULL) AND ${realEmployerId(sql`p.employer_id`)}) AS hired,
+      EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.intern_id = ${U.id} AND ${hiredWhere("p")} AND ${realEmployerId(sql`p.employer_id`)}) AS hired,
       (NOT ${blank(sql`${O.aadhaarNumber}`)} AND NOT ${blank(sql`${O.panNumber}`)}) AS kyc,
       (${O.extraData}->>'approvalStatus' = 'Approved') AS approved,
       pr.last_seen_at AS last_seen
@@ -74,6 +76,7 @@ export type AppCounts = { win: number; winInterns: number; prev: number | null; 
 /** Counts for the strip, status and stage panels: one aggregate over the base CTE, plus the proposals aggregate. */
 export async function loadInternSummary(w: ReportWindow, now: Date): Promise<{ counts: InternCounts; apps: AppCounts }> {
   const db = getDb();
+  const complete = await loadCompleteProfileIds();
   const day = bucketStart(now, "day");
   const week = bucketStart(now, "week");
   const month = bucketStart(now, "month");
@@ -82,7 +85,7 @@ export async function loadInternSummary(w: ReportWindow, now: Date): Promise<{ c
   const [counts, apps] = await Promise.all([
     timed("interns", "counts", () =>
       db
-        .execute(sql`WITH ${baseCte()}
+        .execute(sql`WITH ${baseCte(complete)}
           SELECT count(*)::int AS total,
             count(*) FILTER (WHERE ${rangeSql(created, w.since, w.until)})::int AS new_window,
             ${hasPrev ? sql`count(*) FILTER (WHERE ${rangeSql(created, w.prevSince, w.prevUntil)})::int` : sql`NULL::int`} AS new_prev,
@@ -240,11 +243,12 @@ const explode = (col: string) => sql.raw(`jsonb_array_elements(CASE WHEN jsonb_t
 /** Top 15 skills by interns, each split into the three score bands; plus the overall band split. One CTE, bounded to 15 skills x 4 bands. */
 export async function loadSkillSupply(): Promise<SkillSupply> {
   const db = getDb();
+  const complete = await loadCompleteProfileIds();
   const band = sql`CASE WHEN score IS NULL THEN 'unscored' WHEN score >= 8 THEN 'latte' WHEN score >= 6 THEN 'cappuccino' ELSE 'espresso' END`;
   const [rows, overall] = await Promise.all([
     timed("interns", "skills-by-band", () =>
       db
-        .execute(sql`WITH ${baseCte()},
+        .execute(sql`WITH ${baseCte(complete)},
           ex AS (
             SELECT DISTINCT b.id, lower(trim(s.name)) AS k, trim(s.name) AS label, ${band} AS band
             FROM base b
@@ -257,7 +261,7 @@ export async function loadSkillSupply(): Promise<SkillSupply> {
     ),
     timed("interns", "bands", () =>
       db
-        .execute(sql`WITH ${baseCte()} SELECT ${band} AS band, count(*)::int AS c FROM base GROUP BY 1`)
+        .execute(sql`WITH ${baseCte(complete)} SELECT ${band} AS band, count(*)::int AS c FROM base GROUP BY 1`)
         .then((r) => r.rows as { band: string; c: number }[]),
     ),
   ]);
@@ -315,6 +319,7 @@ const SORT_SQL: Record<InternFilter["sort"], string> = {
 /** One page (or up to `limit` rows for the CSV) of the filtered intern table, plus the filtered total. */
 export async function loadInternTable(f: InternFilter, opts: { limit?: number; offset?: number; withTotal?: boolean } = {}): Promise<{ rows: InternRow[]; total: number }> {
   const db = getDb();
+  const complete = await loadCompleteProfileIds();
   const limit = Math.min(opts.limit ?? INTERN_PAGE_SIZE, 5000);
   const offset = opts.offset ?? (f.page - 1) * INTERN_PAGE_SIZE;
   const where = tableWhere(f);
@@ -322,7 +327,7 @@ export async function loadInternTable(f: InternFilter, opts: { limit?: number; o
   const [rows, total] = await Promise.all([
     timed("interns", "table-page", () =>
       db
-        .execute(sql`WITH ${baseCte()}
+        .execute(sql`WITH ${baseCte(complete)}
           SELECT id, first_name, last_name, email, city, state, college, degree, skills, score, hired, applied, paid, started, complete, created_at, last_seen,
             CASE WHEN banned_at IS NOT NULL THEN 'banned' WHEN visibility = 'hidden' THEN 'hidden' WHEN NOT is_active THEN 'inactive' ELSE 'active' END AS status
           FROM base ${where} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`)
@@ -331,7 +336,7 @@ export async function loadInternTable(f: InternFilter, opts: { limit?: number; o
     opts.withTotal === false
       ? Promise.resolve(0)
       : timed("interns", "table-count", () =>
-          db.execute(sql`WITH ${baseCte()} SELECT count(*)::int AS c FROM base ${where}`).then((r) => n((r.rows[0] as { c: number } | undefined)?.c)),
+          db.execute(sql`WITH ${baseCte(complete)} SELECT count(*)::int AS c FROM base ${where}`).then((r) => n((r.rows[0] as { c: number } | undefined)?.c)),
         ),
   ]);
   return {

@@ -13,13 +13,15 @@ import { profileCompletion } from "@/lib/onboarding";
 import { profileDocsOf } from "@/lib/admin/profile-state";
 import { meetOutcome, MEET_STAGE } from "@/lib/college/meet-outcome";
 import { isHiredProposal } from "@/lib/hire-status";
+import { getAccountType } from "@/lib/intern-account";
 import { parseOffer } from "@/lib/offer";
 import { guaranteeMisses, guaranteeState } from "@/lib/guarantee";
 import { aiLinkState } from "@/lib/admin/ai-link-queue";
 import { loadAiLinkRows } from "@/lib/admin/ai-link-queue-load";
 import {
   isIndianEmployer,
-  offerReply,
+  offerReplyOf,
+  meetingDetail,
   trackOf,
   type BoardEmployer,
   type BoardMeeting,
@@ -67,7 +69,7 @@ export async function loadDashboardBoard(now: Date = new Date()) {
        ORDER BY pr.created_at DESC`),
     // Employer meetings (not the AI interview, which sits under the test employer).
     ex<Record<string, unknown>>(sql`
-      SELECT i.id, i.intern_id, i.employer_id, i.status, i.selected_slot, i.slot1, i.slot2, i.slot3, i.cancelled_by, ${schema.employers.companyName} AS company_name
+      SELECT i.id, i.intern_id, i.employer_id, i.status, i.selected_slot, i.slot1, i.slot2, i.slot3, i.cancelled_by, i.cancel_reason, i.notes, ${schema.employers.companyName} AS company_name
         FROM interviews i JOIN ${schema.employers} ON ${schema.employers.id} = i.employer_id
        WHERE ${realEmployers()}`),
     ex<Record<string, unknown>>(sql`
@@ -101,12 +103,15 @@ export async function loadDashboardBoard(now: Date = new Date()) {
   // ---------- Offers ----------
   const offers: BoardOffer[] = proposals.map((p) => {
     const status = String(p.status);
-    const hired = isHiredProposal({ status, hiredAt: p.hired_at as Date | null });
+    const hiredAt = p.hired_at as Date | null;
+    const hired = isHiredProposal({ status, hiredAt });
     const od = obj(p.offer_details);
+    const full = parseOffer(p.offer_details, p.currency as string | null).fullTime;
     return {
       id: String(p.id), internId: String(p.intern_id), employerId: String(p.employer_id), employer: String(p.company_name ?? ""),
-      track: parseOffer(p.offer_details, p.currency as string | null).fullTime ? "full_time" : "internship",
-      status, reply: offerReply(status, hired), hired, roleTitle: str(od.roleTitle ?? od.title), createdAt: iso(p.created_at),
+      track: full ? "full_time" : "internship",
+      status, reply: offerReplyOf({ status, hiredAt, offerDetails: p.offer_details, currency: p.currency as string | null }, now), hired,
+      ppo: Boolean(full) && typeof obj(od.fullTimeOffer).baseProposalId === "string", roleTitle: str(od.roleTitle ?? od.title), createdAt: iso(p.created_at),
     };
   });
   const proposalsByIntern = Map.groupBy(proposals, (p) => String(p.intern_id));
@@ -115,7 +120,11 @@ export async function loadDashboardBoard(now: Date = new Date()) {
   const meetings: BoardMeeting[] = meetingsRaw.map((m) => {
     const startsAt = m.selected_slot === 1 ? m.slot1 : m.selected_slot === 2 ? m.slot2 : m.selected_slot === 3 ? m.slot3 : null;
     const outcome = meetOutcome({ status: String(m.status), startsAt: startsAt ? new Date(startsAt as string) : null, cancelledBy: m.cancelled_by as string | null }, NOW);
-    return { id: String(m.id), internId: String(m.intern_id), employerId: String(m.employer_id), employer: String(m.company_name ?? ""), stage: MEET_STAGE[outcome], startsAt: iso(startsAt) };
+    const stage = MEET_STAGE[outcome];
+    return {
+      id: String(m.id), internId: String(m.intern_id), employerId: String(m.employer_id), employer: String(m.company_name ?? ""), stage, startsAt: iso(startsAt),
+      ...meetingDetail({ stage, cancelledBy: str(m.cancelled_by), cancelReason: str(m.cancel_reason), notes: str(m.notes) }),
+    };
   });
 
   // ---------- Students ----------
@@ -140,7 +149,7 @@ export async function loadDashboardBoard(now: Date = new Date()) {
       aiStatus, pendingPayment: aiStatus === "applied" && unpaid.has(id),
       cgpaPending: obj(extra.cgpaVerification).status === "pending",
       openToWork: extra.openToWork !== false,
-      collegeLinked: memOf.has(id), membership: str(u.membership),
+      accountType: getAccountType(extra), membership: str(u.membership),
       guarantee: scored ? guaranteeState(extra, guaranteeMisses(mine, now), memOf.get(id)) : null,
       score: u.score == null ? null : Number(u.score),
     };

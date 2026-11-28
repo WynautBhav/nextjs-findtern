@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNotNull, or, sql, type SQL } from "drizzle-or
 import { getSession } from "./auth";
 import { getDb } from "./db";
 import { interviews, proposals, users } from "./db/schema";
-import { isHiredProposal } from "./hire-status";
+import { HIRED_STATUSES, isHiredProposal } from "./hire-status";
 import { parseOffer, todayIst } from "./offer";
 import { ppoRate } from "./college/drive-pricing";
 import { LIVE_STATUSES } from "./employer-offer-status";
@@ -105,9 +105,9 @@ export async function hiredAmong(
   return new Set(rows.map((row) => row.internId));
 }
 
-/** SQL twin of `isHiredProposal` (lib/hire-status): status hired, or hiredAt set. */
+/** SQL twin of `isHiredProposal` (lib/hire-status): status hired or completed, or hiredAt set. */
 export function hiredProposalSql(): SQL {
-  return or(eq(proposals.status, "hired"), isNotNull(proposals.hiredAt))!;
+  return or(inArray(proposals.status, [...HIRED_STATUSES]), isNotNull(proposals.hiredAt))!;
 }
 
 /** Where one candidate stands with this employer, across every project. */

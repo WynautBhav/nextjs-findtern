@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { effectiveProposalStatus } from "@/lib/proposal-expiry";
+import { isHiredProposal } from "@/lib/hire-status";
+import { isOpenProject } from "@/lib/projects/lifecycle";
 import { ExternalLink, Globe, Mail, Phone } from "lucide-react";
 
 import { CompanyActiveToggle, CompanyDeleteButton, CompanyFteSelect } from "@/components/admin/company-controls";
@@ -40,7 +42,6 @@ const money = (minor: number | null | undefined, currency: string | null | undef
   minor == null ? "-" : formatMoney(minor, String(currency).toUpperCase() === "USD" ? "USD" : "INR");
 
 // Live = published (or legacy "active", or blank). Paused, draft, rejected and closed are not.
-const ACTIVE_PROJECT = (status: string | null) => normalizeStatus(status || "published") === "published";
 
 function slotOf(i: Interview): Date | null {
   const s = i.selectedSlot === 1 ? i.slot1 : i.selectedSlot === 2 ? i.slot2 : i.selectedSlot === 3 ? i.slot3 : null;
@@ -90,8 +91,8 @@ export function Company360View({
 
   const now = new Date().getTime();
   const upcoming = interviews.filter((i) => interviewLifecycle(i, now).state === "upcoming" && (slotOf(i)?.getTime() ?? 0) > now).length;
-  const hired = proposals.filter((p) => p.status === "hired");
-  const activeProjects = projects.filter((p) => ACTIVE_PROJECT(p.status)).length;
+  const hired = proposals.filter((p) => isHiredProposal(p));
+  const activeProjects = projects.filter((p) => isOpenProject(p)).length; // the same rule as Companies and Projects
   const projectStatus = STATUS_ORDER.find((s) => s === params.status);
   const shownProjects = projectStatus ? projects.filter((p) => normalizeStatus(p.status || "published") === projectStatus) : projects;
   const dues = ledger.hires.filter((h) => h.dueMinor > 0 || h.plan === "monthly" || h.plan === "postpaid");
@@ -269,7 +270,7 @@ export function Company360View({
               },
             },
             { header: "Full-time", cell: (p) => (p.fullTimeOffer ? "Yes" : "No") },
-            { header: "Status", cell: (p) => <StatusBadge value={ACTIVE_PROJECT(p.status) ? "active" : p.status || "closed"} label={statusMeta(p.status || "published").label} /> },
+            { header: "Status", cell: (p) => <StatusBadge value={isOpenProject(p) ? "active" : p.status || "closed"} label={statusMeta(p.status || "published").label} /> },
             { header: "Posted", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.createdAt)}</span> },
             { header: "Details", cell: (p) => <ProjectDetailsButton project={p} /> },
           ]}

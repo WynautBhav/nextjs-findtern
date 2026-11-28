@@ -7,7 +7,8 @@ import { computeAnalytics, type AnalyticsInput } from "@/lib/admin/analytics";
 import { legacyFeeFlag } from "@/lib/admin/fee-flag";
 import { periodStart } from "@/lib/admin/params";
 import { isMoneyReceived, istDateRange, istMonthKeys, istMonthStart } from "@/lib/admin/revenue";
-import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { loadCompleteProfileIds } from "@/lib/admin/profile-state-load";
 
 /** Range from `?from=&to=` (`YYYY-MM-DD` India dates, inclusive; the date filter only sends that form), `?period=30d`, or `?period=all`; default the last 18 months (legacy). */
 export function analyticsRange(params: Record<string, string | undefined>): { since: Date | null; until: Date | null } {
@@ -29,7 +30,7 @@ export function analyticsRange(params: Record<string, string | undefined>): { si
 export async function loadAnalytics(range: { since: Date | null; until: Date | null }) {
   const db = getDb();
   const hasCity = sql`trim(coalesce(${schema.internOnboarding.city}, '')) <> ''`;
-  const [interns, onboarding, employers, projects, proposals, interviews, employerPayments, internPayments, collegeBatches, cityRows, [cityTotal]] = await Promise.all([
+  const [interns, onboarding, employers, projects, proposals, interviews, employerPayments, internPayments, collegeBatches, cityRows, [cityTotal], completeIds] = await Promise.all([
     db
       .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName, createdAt: schema.users.createdAt })
       .from(schema.users)
@@ -38,7 +39,6 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
       .select({
         userId: schema.internOnboarding.userId,
         createdAt: schema.internOnboarding.createdAt,
-        meaningful: meaningfulProfile(),
         extraData: schema.internOnboarding.extraData,
       })
       .from(schema.internOnboarding)
@@ -94,7 +94,8 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
         raw: schema.employerPayments.raw,
       })
       .from(schema.employerPayments)
-      .where(inArray(schema.employerPayments.status, SETTLED_STATUSES)),
+      // Test employers are not customers (Collected leaves them out too).
+      .where(and(inArray(schema.employerPayments.status, SETTLED_STATUSES), realEmployerId(schema.employerPayments.employerId))),
     db
       .select({
         internId: schema.internPayments.internId,
@@ -130,6 +131,7 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
       .from(schema.internOnboarding)
       .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
       .where(and(eq(schema.users.role, "intern"), hasCity, isNewestOnboarding())),
+    loadCompleteProfileIds(),
   ]);
 
   // Paid either way legacy records it: a paid intern_payments row or the flag.
@@ -143,7 +145,7 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
       return {
         userId: o.userId,
         createdAt: o.createdAt,
-        meaningful: Boolean(o.meaningful),
+        complete: completeIds.has(o.userId),
         feePaid: legacyFeeFlag(o.extraData) || paidInterns.has(o.userId),
         score: Number.isFinite(score) ? score : null,
       };

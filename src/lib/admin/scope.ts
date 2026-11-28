@@ -2,6 +2,8 @@ import { and, ne, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 
 import { schema } from "@/lib/db";
 import { INR_PER_USD } from "@/lib/currency";
+import { HIRED_STATUSES } from "@/lib/hire-status";
+import { WON_STATUSES } from "@/lib/proposals";
 
 /**
  * Shared filters for admin counts and lists, so every screen agrees.
@@ -33,7 +35,26 @@ export function activeProject(): SQL {
   return sql`coalesce(nullif(lower(${schema.projects.status}), ''), 'active') IN ('active', 'published')`;
 }
 
+/** Open to candidates: an active project not taken down by Findtern (pure twin: projects/lifecycle isOpenProject). Admin counts use this. */
+export function openProject(): SQL {
+  return sql`(${activeProject()} AND ${schema.projects.takenDownAt} IS NULL)`;
+}
+
 export { toInrMinor } from "./money";
+
+/**
+ * SQL twin of `isHiredProposal` (lib/hire-status) for a proposals table under alias `t`: status hired or completed, or a
+ * hire date. Every admin count of hires uses this, so Companies, the Proposal pipeline, Reports and the Dashboard agree.
+ */
+export function hiredWhere(t: string): SQL {
+  const a = sql.identifier(t);
+  return sql`(lower(${a}.status) IN (${sql.join(HIRED_STATUSES.map((s) => sql`${s}`), sql`, `)}) OR ${a}.hired_at IS NOT NULL)`;
+}
+
+/** The student said yes (lib/proposals proposalOutcome "won"), for a proposals table under alias `t`. */
+export function wonWhere(t: string): SQL {
+  return sql`lower(${sql.identifier(t)}.status) IN (${sql.join(WON_STATUSES.map((s) => sql`${s}`), sql`, `)})`;
+}
 
 /** SQL twin of `toInrMinor` for SUM()s. */
 export function inrMinorSql(amount: SQLWrapper, currency: SQLWrapper): SQL<number> {
@@ -57,6 +78,14 @@ export function meaningfulProfile(): SQL<boolean> {
     OR coalesce(trim(${o.extraData}->'bankDetails'->>'accountNumber'), '') <> ''
     OR coalesce(trim(${o.extraData}->'bankDetails'->>'upiId'), '') <> ''
   ))`;
+}
+
+/**
+ * The column is one of these ids, for a set computed outside SQL (the admin's complete-profile set, loadCompleteProfileIds,
+ * whose rules are too deep for SQL). An empty set matches nothing.
+ */
+export function idIn(col: SQLWrapper, ids: ReadonlySet<string>): SQL<boolean> {
+  return ids.size ? sql<boolean>`(${col} = ANY(${sql.param([...ids])}::text[]))` : sql<boolean>`false`;
 }
 
 /** One column of the intern's latest AI interview row (expects `users`). */

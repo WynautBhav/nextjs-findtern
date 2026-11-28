@@ -8,6 +8,8 @@ import {
   stackOf,
   isIndianEmployer,
   offerReply,
+  offerReplyOf,
+  meetingDetail,
   pct,
   studentMetrics,
   trackCounts,
@@ -21,12 +23,12 @@ import {
 const student = (id: string, o: Partial<BoardStudent> = {}): BoardStudent => ({
   id, name: id, email: `${id}@x.in`, phone: null, college: null, collegeId: null, year: null, branch: null, createdAt: null,
   lastSeenAt: null, activityHidden: false, online: false, track: null, profilePct: 0, profileComplete: false, aiStatus: "not_applied",
-  pendingPayment: false, cgpaPending: false, openToWork: true, collegeLinked: false, membership: null, guarantee: null, score: null, ...o,
+  pendingPayment: false, cgpaPending: false, openToWork: true, accountType: null, membership: null, guarantee: null, score: null, ...o,
 });
 const offer = (id: string, internId: string, o: Partial<BoardOffer> = {}): BoardOffer => ({
-  id, internId, employerId: "e-in", employer: "E", track: "internship", status: "sent", reply: "pending", hired: false, roleTitle: null, createdAt: null, ...o,
+  id, internId, employerId: "e-in", employer: "E", track: "internship", status: "sent", reply: "pending", hired: false, ppo: false, roleTitle: null, createdAt: null, ...o,
 });
-const meeting = (id: string, internId: string, stage: BoardMeeting["stage"]): BoardMeeting => ({ id, internId, employerId: "e-in", employer: "E", stage, startsAt: null });
+const meeting = (id: string, internId: string, stage: BoardMeeting["stage"]): BoardMeeting => ({ id, internId, employerId: "e-in", employer: "E", stage, startsAt: null, reason: null, feedback: null });
 const employer = (id: string, o: Partial<BoardEmployer> = {}): BoardEmployer => ({
   id, company: id, contact: null, email: null, phone: null, city: null, country: "India", indian: true, size: null, onboarded: false,
   viaDrive: false, inDriveNow: false, fte: "none", createdAt: null, ...o,
@@ -63,8 +65,8 @@ test("offerReply: hired counts as accepted; sent and interview_scheduled wait fo
 
 const data = () => ({
   students: [
-    student("a", { track: "tech", aiStatus: "completed", profileComplete: true, guarantee: "active", collegeLinked: true }),
-    student("b", { track: "non_tech", aiStatus: "completed", profileComplete: true, guarantee: "none", openToWork: false, online: true }),
+    student("a", { track: "tech", aiStatus: "completed", profileComplete: true, guarantee: "active", accountType: "college" }),
+    student("b", { accountType: "individual", track: "non_tech", aiStatus: "completed", profileComplete: true, guarantee: "none", openToWork: false, online: true }),
     student("c", { track: "tech", aiStatus: "completed", guarantee: "ended", cgpaPending: true }),
     student("d", { aiStatus: "applied", pendingPayment: true }),
     student("e", { aiStatus: "scheduled" }),
@@ -91,7 +93,11 @@ test("studentMetrics: every count is its list, and the pairs split their whole",
   assert.equal(n("aiScheduled"), 1);
   assert.equal(n("aiInterviewed"), 3);
   assert.equal(n("openToWork") + n("hidden"), n("signedUp"));
-  assert.equal(n("collegeLinked") + n("individual"), n("signedUp"));
+  // Account type is what the student chose on the profile: college, individual, or not chosen yet (older accounts).
+  assert.equal(n("accountCollege"), 1);
+  assert.equal(n("accountIndividual"), 1);
+  assert.equal(n("accountUnset"), 3);
+  assert.equal(n("accountCollege") + n("accountIndividual") + n("accountUnset"), n("signedUp"));
   assert.equal(n("onlineNow"), 1);
   assert.equal(n("cgpaPending"), 1);
   assert.deepEqual(m.offersAwaiting.ids, ["o6"]);
@@ -241,4 +247,43 @@ test("studentMetrics: meetings split their total into completed, upcoming, waiti
   );
   const parts = [m.meetsCompleted, m.meetsUpcoming, m.meetingsAwaiting, m.meetsExpired, m.meetsWithdrawn].reduce((s, l) => s + l.ids.length, 0);
   assert.equal(parts, m.meetsAll.ids.length);
+});
+
+test("offerReplyOf: an unanswered offer whose start day has passed is expired, as on the Proposal pipeline", () => {
+  const past = { startDate: "2020-01-01" };
+  const now = new Date("2026-11-28T12:00:00Z");
+  assert.equal(offerReplyOf({ status: "sent", hiredAt: null, offerDetails: past }, now), "expired");
+  assert.equal(offerReplyOf({ status: "accepted", hiredAt: null, offerDetails: past }, now), "expired"); // unpaid past start
+  assert.equal(offerReplyOf({ status: "processing", hiredAt: null, offerDetails: past }, now), "accepted"); // money in flight
+  assert.equal(offerReplyOf({ status: "completed", hiredAt: null, offerDetails: past }, now), "accepted");
+  assert.equal(offerReplyOf({ status: "sent", hiredAt: null, offerDetails: { startDate: "2099-01-01" } }, now), "pending");
+});
+
+test("studentMetrics: hires split into internship running, internship completed, full-time and PPO, adding up to every hire", () => {
+  const d = {
+    students: [student("a"), student("b"), student("c"), student("d")],
+    offers: [
+      offer("h1", "a", { hired: true, reply: "accepted", status: "hired" }),
+      offer("h2", "b", { hired: true, reply: "accepted", status: "completed" }),
+      offer("h3", "c", { hired: true, reply: "accepted", status: "hired", track: "full_time" }),
+      offer("h4", "b", { hired: true, reply: "accepted", status: "hired", track: "full_time", ppo: true }), // after b's internship
+      offer("x", "d", { reply: "pending" }),
+    ],
+    meetings: [],
+    employers: [{ id: "e-in", indian: true }],
+  };
+  const m = studentMetrics(d);
+  assert.deepEqual(m.placeInternRunning.ids, ["h1"]);
+  assert.deepEqual(m.placeInternCompleted.ids, ["h2"]);
+  assert.deepEqual(m.placeFullTime.ids, ["h3"]);
+  assert.deepEqual(m.placePpo.ids, ["h4"]);
+  assert.equal(m.placeAll.ids.length, 4);
+});
+
+test("meetingDetail: a withdrawn meeting says who withdrew it and why; a completed one carries the employer's feedback", () => {
+  assert.deepEqual(meetingDetail({ stage: "withdrawn", cancelledBy: "employer", cancelReason: "Role filled", notes: null }), { reason: "Withdrawn by the employer: Role filled", feedback: null });
+  assert.deepEqual(meetingDetail({ stage: "withdrawn", cancelledBy: "intern", cancelReason: " ", notes: null }), { reason: "Withdrawn by the student, no reason given", feedback: null });
+  assert.deepEqual(meetingDetail({ stage: "completed", cancelledBy: null, cancelReason: null, notes: "admin note\nfeedback_text: Strong React.\nGood fit" }), { reason: null, feedback: "Strong React.\nGood fit" });
+  assert.deepEqual(meetingDetail({ stage: "completed", cancelledBy: null, cancelReason: null, notes: "admin note only" }), { reason: null, feedback: "No feedback written" });
+  assert.deepEqual(meetingDetail({ stage: "sent", cancelledBy: null, cancelReason: null, notes: null }), { reason: null, feedback: null });
 });

@@ -1,3 +1,4 @@
+import { proposalOutcome } from "../../proposals.ts";
 /** Pure helpers for the Employers tab: project lifecycle buckets, proposal buckets, skill demand vs supply, the company table filter. */
 
 export type LifecycleCounts = { total: number; published: number; paused: number; draft: number; pending_review: number; rejected: number; closed: number; other: number };
@@ -28,7 +29,7 @@ export type ProposalBuckets = { sent: number; accepted: number; rejected: number
 /**
  * Raw proposal status counts -> what an owner asks about. `sent` is every proposal that left the employer
  * (all but drafts); it equals accepted + rejected + pending + expired + withdrawn. `accepted` includes
- * `hired` (lib/proposals.ts: both are wins). An unknown status counts as sent only.
+ * `processing`, `hired` and `completed` (lib/proposals.ts proposalOutcome: all wins). An unknown status counts as sent only.
  */
 export function companyProposalBuckets(rows: readonly { status: string | null; n: number }[]): ProposalBuckets {
   const b: ProposalBuckets = { sent: 0, accepted: 0, rejected: 0, pending: 0, expired: 0, withdrawn: 0 };
@@ -36,7 +37,7 @@ export function companyProposalBuckets(rows: readonly { status: string | null; n
     const s = String(r.status ?? "").trim().toLowerCase();
     if (s === "draft") continue;
     b.sent += r.n;
-    if (s === "accepted" || s === "hired") b.accepted += r.n;
+    if (proposalOutcome(s) === "won") b.accepted += r.n;
     else if (s === "rejected") b.rejected += r.n;
     else if (s === "sent" || s === "interview_scheduled") b.pending += r.n;
     else if (s === "expired") b.expired += r.n;

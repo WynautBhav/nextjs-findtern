@@ -67,6 +67,14 @@ export function isVisibleToInterns(status: string | null | undefined): boolean {
   return normalizeStatus(status) === "published";
 }
 
+/**
+ * Open to candidates, as every admin count reads it (SQL twin: scope.ts openProject): published, where a legacy `active`
+ * or a blank status is published, in any case; and not taken down by Findtern.
+ */
+export function isOpenProject(p: { status: string | null | undefined; takenDownAt: Date | string | null | undefined }): boolean {
+  return normalizeStatus((p.status ?? "").trim().toLowerCase() || "published") === "published" && !p.takenDownAt;
+}
+
 export function isEditableByEmployer(status: string | null | undefined): boolean {
   const s = normalizeStatus(status);
   return s === "draft" || s === "rejected" || s === "paused";

@@ -25,7 +25,8 @@ export type AnalyticsInput = {
   since: Date | null;
   until: Date | null;
   interns: { id: string; firstName: string | null; lastName: string | null; createdAt: Date | null }[];
-  onboarding: { userId: string; createdAt: Date | null; meaningful: boolean; feePaid: boolean; score: number | null }[];
+  /** `complete` is the admin's complete-profile rule (loadCompleteProfileIds), the same set the Interns page and Dashboard use. */
+  onboarding: { userId: string; createdAt: Date | null; complete: boolean; feePaid: boolean; score: number | null }[];
   employers: { id: string; companyName: string; createdAt: Date | null }[];
   projects: { id: string; employerId: string; status: string | null; skills: unknown; city: string | null; state: string | null; createdAt: Date | null }[];
   proposals: {
@@ -55,7 +56,7 @@ const ratio = (n: number, d: number) => (d > 0 ? Number((n / d).toFixed(1)) : 0)
  * A hire is a hire date or status hired/completed (college master-data, lib/hire-status), never a bare `accepted`: an accepted
  * offer is unpaid, the employer still sees the intern masked, and it can expire unpaid.
  */
-export const isHire = (p: { status: string; hiredAt?: Date | string | null }) => isHiredProposal(p) || p.status.trim().toLowerCase() === "completed";
+export const isHire = (p: { status: string; hiredAt?: Date | string | null }) => isHiredProposal({ ...p, status: p.status.trim() });
 
 export function computeAnalytics(input: AnalyticsInput) {
   const { since, until } = input;
@@ -68,7 +69,10 @@ export function computeAnalytics(input: AnalyticsInput) {
   // A draft has not been sent to anyone: it is not an offer, an application or a "Sent" status (the dashboard and the
   // Proposals pages already leave drafts out). Counting them put 35 "offers sent" here against 33 on the dashboard.
   const proposals = input.proposals.filter((p) => p.status.trim().toLowerCase() !== "draft");
-  const onboardingIn = input.onboarding.filter((o) => inRange(o.createdAt));
+  // A signup is an intern account made in the range (Overview's "New interns"), not a profile row touched in it.
+  const signedUpIn = new Set(input.interns.filter((i) => inRange(i.createdAt)).map((i) => i.id));
+  const onboardingOf = new Map(input.onboarding.map((o) => [o.userId, o]));
+  const onboardingIn = [...signedUpIn].map((id) => onboardingOf.get(id) ?? { userId: id, createdAt: null, complete: false, feePaid: false, score: null });
   const proposalsIn = proposals.filter((p) => inRange(p.createdAt));
   const interviewsIn = input.interviews.filter((i) => inRange(i.createdAt));
   const employersIn = input.employers.filter((e) => inRange(e.createdAt));
@@ -77,7 +81,7 @@ export function computeAnalytics(input: AnalyticsInput) {
   const isFullTime = (p: { offerDetails: unknown; currency: string | null }) => Boolean(parseOffer(p.offerDetails, p.currency).fullTime);
 
   const signups = onboardingIn.length;
-  const activeUsers = onboardingIn.filter((o) => o.meaningful).length;
+  const activeUsers = onboardingIn.filter((o) => o.complete).length;
   const applied = new Set(proposalsIn.map((p) => p.internId));
   const interviewed = new Set(interviewsIn.map((i) => i.internId));
   const placed = new Set(proposalsIn.filter(isHire).map((p) => p.internId));
@@ -85,7 +89,8 @@ export function computeAnalytics(input: AnalyticsInput) {
   const fullTimeProposals = proposalsIn.filter(isFullTime).length;
 
   const sumInr = (rows: AnalyticsInput["employerPayments"]) =>
-    rows.filter((r) => r.status === "paid" && inRange(r.paidAt ?? r.createdAt)).reduce((s, r) => s + toInrMinor(revenueMinorOf(r), r.currency), 0);
+    // Gross, like Collected (receivables-load paidReceipts): a refunded or partly refunded order was money received.
+    rows.filter((r) => isSettledStatus(r.status) && inRange(r.paidAt ?? r.createdAt)).reduce((s, r) => s + toInrMinor(revenueMinorOf(r), r.currency), 0);
   const revenueEmployersMinor = sumInr(input.employerPayments);
   const revenueInternsMinor = sumInr(input.internPayments);
   const revenueCollegesMinor = sumInr((input.collegeBatches ?? []).map((b) => ({ ...b, currency: "INR" })));
@@ -99,7 +104,7 @@ export function computeAnalytics(input: AnalyticsInput) {
   if (since) {
     const end = until ?? new Date();
     const span = end.getTime() - since.getTime();
-    const prev = input.onboarding.filter((o) => {
+    const prev = input.interns.filter((o) => {
       const t = o.createdAt ? new Date(o.createdAt).getTime() : NaN;
       return t >= since.getTime() - span && t < since.getTime();
     }).length;
@@ -285,26 +290,29 @@ export function computeAnalytics(input: AnalyticsInput) {
     .sort((a, b) => String(b.hiredAt).localeCompare(String(a.hiredAt)));
 
   // Legacy's "Application status" tiles: every proposal ever, whatever the period (legacy server/routes.ts:6461-6497).
-  const applicationStatus = applicationStatusBuckets(proposals.map((p) => ({ status: p.status, fullTime: isFullTime(p) })));
+  const applicationStatus = applicationStatusBuckets(proposals.map((p) => ({ status: p.status, fullTime: isFullTime(p), hired: isHire(p) })));
   const cities = topWithOthers(input.cities ?? [], input.citiesTotal ?? 0);
 
   return { totals, rates, funnel, trend, skillDemand, regionDemand, highestPayingSkills, topCompanies, topInterns, hiredList, applicationStatus, cities };
 }
 
-const STATUS_ORDER = ["Sent", "Under Review", "Interviewed", "Hired (Internship)", "Hired (Full-time)", "Rejected", "Withdrawn"];
+const STATUS_ORDER = ["Sent", "Under Review", "Interviewed", "Hired (Internship)", "Hired (Full-time)", "Accepted, not paid", "Rejected", "Expired", "Withdrawn"];
 
-/** Legacy's seven proposal-status groups with counts, largest first (ties in the order Sent, Under Review, Interviewed, hired, Rejected, Withdrawn); empty groups are left out. */
-export function applicationStatusBuckets(rows: { status: string; fullTime: boolean }[]): { name: string; value: number }[] {
+/** Offer-status groups with counts, largest first; empty groups are left out. Hired is a paid hire only (isHire), so it matches Hires above. */
+export function applicationStatusBuckets(rows: { status: string; fullTime: boolean; hired: boolean }[]): { name: string; value: number }[] {
   const counts = new Map<string, number>();
   for (const r of rows) {
     const raw = r.status.trim().toLowerCase();
     if (!raw || raw === "draft") continue;
     const name =
-      raw === "accepted" || raw === "hired" ? (r.fullTime ? "Hired (Full-time)" : "Hired (Internship)")
+      // Hired is a paid hire only (isHire, the rule every screen uses); a yes still being paid for is apart.
+      r.hired ? (r.fullTime ? "Hired (Full-time)" : "Hired (Internship)")
+      : raw === "accepted" || raw === "processing" ? "Accepted, not paid"
       : raw === "rejected" ? "Rejected"
       : raw === "interview_scheduled" || raw === "interviewed" ? "Interviewed"
       : raw === "under_review" || raw === "review" || raw === "reviewing" ? "Under Review"
-      : raw === "withdrawn" || raw === "expired" ? "Withdrawn"
+      : raw === "expired" ? "Expired"
+      : raw === "withdrawn" ? "Withdrawn"
       : "Sent";
     counts.set(name, (counts.get(name) ?? 0) + 1);
   }

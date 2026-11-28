@@ -211,7 +211,7 @@ export default async function HiringAnalytics({ window: w, params }: TabProps) {
         title="Offers and where interns are"
         description="Both are all time, not limited to the range."
         groups={[
-          { title: "Offer status", note: "Every offer ever sent, grouped as the old report did. Accepted offers count as hired here, so this can exceed Hires above (paid hires in the range).", rows: a.applicationStatus.map((x) => ({ label: x.name, value: x.value })) },
+          { title: "Offer status", note: "Every offer ever sent, grouped as the old report did. Hired is a paid hire, as everywhere else; accepted offers still being paid for are apart.", rows: a.applicationStatus.map((x) => ({ label: x.name, value: x.value })) },
           { title: "Interns by city", note: "Top six cities; Others is the rest", rows: a.cities.map((x) => ({ label: x.city, value: x.count, display: `${formatNumber(x.count)} \u00b7 ${x.percentage}%` })) },
         ]}
       />

@@ -12,7 +12,9 @@ import { StatStrip, trendOf } from "@/components/admin/reports/stat-strip";
 import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { formatPercentDelta, percentChange, previousWindow } from "@/lib/admin/reports-shape";
-import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { idIn, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { loadCompleteProfileIds } from "@/lib/admin/profile-state-load";
+import { hiredProposalSql } from "@/lib/employer-visibility";
 import { istKeySql, istMonthKeys, istMonthLabel, istMonthStart, utcSql } from "@/lib/admin/revenue";
 import { loadCollected, loadReceiptBuckets } from "@/lib/admin/receivables-load";
 import type { TabProps } from "../types";
@@ -28,6 +30,9 @@ export default async function PlatformSummary({ window: w }: TabProps) {
   const since = w.since;
   const until = w.until;
   /** Totals respect the chosen period; trend charts always show six months. */
+  // A hire is dated by its hire date; a legacy completed row with none falls back to its last update (as the Reports funnel).
+  const hiredOn = sql`coalesce(${schema.proposals.hiredAt}, ${schema.proposals.updatedAt})`;
+  const hiredIn = and(since ? sql`${hiredOn} >= ${since}` : undefined, until ? sql`${hiredOn} < ${until}` : undefined);
   const from = (col: AnyPgColumn) => and(since ? gte(col, since) : undefined, until ? lt(col, until) : undefined);
   const db = getDb();
   // Six India months ending now, for every monthly trend on the page.
@@ -51,13 +56,12 @@ export default async function PlatformSummary({ window: w }: TabProps) {
     revenueMonthly,
   ] = await Promise.all([
     db.select({ c: count() }).from(schema.users).where(and(eq(schema.users.role, "intern"), from(schema.users.createdAt))),
-    db
-      .select({ c: count() })
-      .from(schema.internOnboarding)
-      .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
-      .where(and(eq(schema.users.role, "intern"), meaningfulProfile(), isNewestOnboarding(), from(schema.internOnboarding.createdAt))),
+    // Of the signups above, how many have a complete profile (the admin's rule, as on the Interns page and Dashboard).
+    loadCompleteProfileIds().then((ids) =>
+      db.select({ c: count() }).from(schema.users).where(and(eq(schema.users.role, "intern"), idIn(schema.users.id, ids), from(schema.users.createdAt))),
+    ),
     db.select({ c: count() }).from(schema.interviews).where(and(realInterview, from(schema.interviews.createdAt))),
-    db.select({ c: count() }).from(schema.proposals).where(and(realProposal, sql`${schema.proposals.hiredAt} is not null`, from(schema.proposals.hiredAt))),
+    db.select({ c: count() }).from(schema.proposals).where(and(realProposal, hiredProposalSql(), hiredIn)),
     db.select({ c: count() }).from(schema.employers).where(and(realEmployers(), from(schema.employers.createdAt))),
     db.select({ c: count() }).from(schema.projects).where(and(realEmployerId(schema.projects.employerId), from(schema.projects.createdAt))),
     db

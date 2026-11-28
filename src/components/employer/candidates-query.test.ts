@@ -34,9 +34,9 @@ test("the Shortlist tab count and the compare picks leave hired interns out too"
   assert.match(src, /filters\.ids = filters\.ids\.filter\(\(id\) => !hiredPicks\.has\(id\)\)/);
 });
 
-test("the hired rule is the one every other screen uses (status hired, or hired_at set)", () => {
+test("the hired rule is the one every other screen uses (status hired or completed, or hired_at set)", () => {
   const vis = readFileSync(join(import.meta.dirname, "../../lib/employer-visibility.ts"), "utf8");
-  assert.match(vis, /export function hiredProposalSql\(\): SQL \{\s*return or\(eq\(proposals\.status, "hired"\), isNotNull\(proposals\.hiredAt\)\)!;/);
+  assert.match(vis, /export function hiredProposalSql\(\): SQL \{\s*return or\(inArray\(proposals\.status, \[\.\.\.HIRED_STATUSES\]\), isNotNull\(proposals\.hiredAt\)\)!;/);
   const not = vis.slice(vis.indexOf("export function notHiredByEmployerSql"));
   assert.match(not, /NOT EXISTS[\s\S]*?\$\{proposals\.employerId\} = \$\{employerId\}[\s\S]*?\$\{proposals\.internId\} = \$\{users\.id\}[\s\S]*?\$\{hiredProposalSql\(\)\}/);
   // Never `hiredInternIds`: an admin "View as" would then hide everyone.

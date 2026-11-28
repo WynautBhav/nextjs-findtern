@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CalendarX2 } from "lucide-react";
 
+import { isHiredProposal } from "@/lib/hire-status";
 import { AdminTabs } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
 import { AdminEmpty, Panel, PanelHeader } from "@/components/admin/panel";
@@ -117,7 +118,7 @@ export function ProposalTrackerView({
   expired: ExpiredRow[];
   options: { companies: Option[]; interns: Option[]; timezones: Option[] };
 }) {
-  const hired = proposals.filter((p) => p.status === "hired");
+  const hired = proposals.filter((p) => isHiredProposal(p));
   const candidateIds = new Set(proposals.map((p) => p.internId));
   const activeCompanies = employers.filter((e) => proposals.some((p) => p.employerId === e.id) || interviews.some((i) => i.employerId === e.id));
 
@@ -186,7 +187,7 @@ function CompaniesTab({
         ...e,
         proposals: mine.length,
         interviews: interviews.filter((i) => i.employerId === e.id).length,
-        hired: mine.filter((p) => p.status === "hired").length,
+        hired: mine.filter((p) => isHiredProposal(p)).length,
         won,
         lost,
         rate: acceptanceRate(won, lost),
@@ -291,7 +292,7 @@ function ProposalsTab({ params, search, pickers, rows }: Pick<TabProps, "params"
       company: p.companyName ?? "Company",
       project: p.projectName ?? "Project",
       flow,
-      fullTimeHired: p.status === "hired" && Boolean(o.fullTime),
+      fullTimeHired: isHiredProposal(p) && Boolean(o.fullTime),
       cgpaVerifying: p.cgpaGate ? { acceptedAt: p.cgpaGate.acceptedAt, correction: p.cgpaGate.state === "incorrect_unacked" } : null,
       amount: o.fullTime
         ? `${o.fullTime.annualCtcMinor != null ? formatMoney(o.fullTime.annualCtcMinor, o.currency) : "-"} CTC`
