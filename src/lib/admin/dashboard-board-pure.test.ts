@@ -229,7 +229,7 @@ test("funnel: a station counts everyone who got this far, so stopped always equa
   assert.deepEqual([clean[0].reached, clean[0].skipped, clean[1].reached], [["a", "b"], [], ["a"]]);
 });
 
-test("studentMetrics: meetings split their total into completed, upcoming, waiting, declined, expired and withdrawn", () => {
+test("studentMetrics: meetings split their total into completed, upcoming, waiting, expired and withdrawn", () => {
   const meetings = [
     meeting("m1", "a", "completed"),
     meeting("m2", "a", "completed"),
@@ -238,15 +238,15 @@ test("studentMetrics: meetings split their total into completed, upcoming, waiti
     meeting("m5", "a", "expired"),
     meeting("m6", "a", "withdrawn"),
     meeting("m7", "nobody", "completed"), // not one of the students: left out
-    meeting("m8", "a", "declined"),
+    meeting("m8", "a", "expired"), // a declined meeting is expired (MEET_STAGE)
   ];
   const m = studentMetrics({ students: [student("a")], offers: [], meetings, employers: [] });
   assert.deepEqual(m.meetsAll.ids, ["m1", "m2", "m3", "m4", "m5", "m6", "m8"]);
   assert.deepEqual(
-    [m.meetsCompleted.ids, m.meetsUpcoming.ids, m.meetingsAwaiting.ids, m.meetsDeclined.ids, m.meetsExpired.ids, m.meetsWithdrawn.ids],
-    [["m1", "m2"], ["m3"], ["m4"], ["m8"], ["m5"], ["m6"]],
+    [m.meetsCompleted.ids, m.meetsUpcoming.ids, m.meetingsAwaiting.ids, m.meetsExpired.ids, m.meetsWithdrawn.ids],
+    [["m1", "m2"], ["m3"], ["m4"], ["m5", "m8"], ["m6"]],
   );
-  const parts = [m.meetsCompleted, m.meetsUpcoming, m.meetingsAwaiting, m.meetsDeclined, m.meetsExpired, m.meetsWithdrawn].reduce((s, l) => s + l.ids.length, 0);
+  const parts = [m.meetsCompleted, m.meetsUpcoming, m.meetingsAwaiting, m.meetsExpired, m.meetsWithdrawn].reduce((s, l) => s + l.ids.length, 0);
   assert.equal(parts, m.meetsAll.ids.length);
 });
 

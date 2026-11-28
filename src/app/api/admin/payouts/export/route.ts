@@ -6,16 +6,21 @@ import { flattenParams } from "@/lib/admin/params";
 import { allows, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
 import {
   DUE_FILTERS,
+  DUE_SORTS,
+  dueHeatView,
   filterDues,
-  loadPayouts,
+  heatDues,
+  loadPayoutsWithHeat,
   loadPlacementDues,
-  PAYOUT_SORTS,
+  PAYOUT_LIST_SORTS,
   payoutSourceLabel,
   type DueFilter,
-  type PayoutSort,
-  type PlacementDueRow,
-  type PayoutRow,
+  type DueSort,
+  type HeatedDueRow,
+  type HeatedPayoutRow,
+  type PayoutListSort,
 } from "@/lib/admin/payout-list";
+import { heatCsv, parseHeatBand } from "@/lib/admin/payout-heat";
 import { payoutKindLabel } from "@/lib/admin/payout-kind";
 import { todayIst } from "@/lib/timesheet-days";
 import { getSession } from "@/lib/auth";
@@ -53,8 +58,10 @@ export async function GET(req: Request) {
 
   if (params.view === "dues") {
     const filter = (DUE_FILTERS as readonly string[]).includes(params.due ?? "") ? (params.due as DueFilter) : "all";
-    const rows = filterDues(await loadPlacementDues(), filter, params.q ?? "");
-    const columns: CsvColumn<PlacementDueRow>[] = [
+    const sort = (DUE_SORTS as readonly string[]).includes(params.sort ?? "") ? (params.sort as DueSort) : "heat";
+    const dir = params.sort ? (params.dir === "asc" ? "asc" : "desc") : "desc";
+    const rows = dueHeatView(await heatDues(filterDues(await loadPlacementDues(), filter, params.q ?? "")), parseHeatBand(params.heat), sort, dir);
+    const columns: CsvColumn<HeatedDueRow>[] = [
       { header: "Intern", value: (r) => r.internName },
       { header: "Employer", value: (r) => r.companyName },
       { header: "Project", value: (r) => r.projectName },
@@ -69,6 +76,7 @@ export async function GET(req: Request) {
       { header: "Payout pending", value: (r) => (r.pending ? "yes" : "no") },
       { header: "Employer months paid", value: (r) => r.employer?.paidMonths ?? "" },
       { header: "Employer due (INR)", value: (r) => (r.employer ? money(r.employer.dueInrMinor) : "") },
+      { header: "Heat", value: (r) => heatCsv(r.heat) },
     ];
     // Fail closed: no audit row, no file.
     try {
@@ -81,15 +89,15 @@ export async function GET(req: Request) {
     return csvResponse(toCsv(rows, columns), csvFilename("employer-dues"));
   }
 
-  const sort = (PAYOUT_SORTS as readonly string[]).includes(params.sort ?? "") ? (params.sort as PayoutSort) : "scheduled";
-  const { rows } = await loadPayouts(params, { offset: 0, limit: MAX_ROWS + 1, sort, dir: params.dir === "asc" ? "asc" : "desc" });
+  const sort = (PAYOUT_LIST_SORTS as readonly string[]).includes(params.sort ?? "") ? (params.sort as PayoutListSort) : "heat";
+  const { rows } = await loadPayoutsWithHeat(params, { offset: 0, limit: MAX_ROWS + 1, sort, dir: params.sort && params.dir === "asc" ? "asc" : "desc" });
   if (rows.length > MAX_ROWS) {
     return NextResponse.json(
       { error: `More than ${MAX_ROWS} payouts match. Narrow the filters (dates, status) and export again.` },
       { status: 413 },
     );
   }
-  const columns: CsvColumn<PayoutRow>[] = [
+  const columns: CsvColumn<HeatedPayoutRow>[] = [
     { header: "Intern", value: (r) => r.internName },
     { header: "Email", value: (r) => r.internEmail ?? "" },
     { header: "Employer", value: (r) => r.companyName ?? "" },
@@ -107,6 +115,7 @@ export async function GET(req: Request) {
     { header: "Created at", value: (r) => day(r.createdAt) },
     { header: "Role", value: (r) => r.notes ?? "" },
     { header: "Ops note", value: (r) => r.opsNote ?? "" },
+    { header: "Heat", value: (r) => heatCsv(r.heat) },
   ];
   // Fail closed: no audit row, no file.
   try {

@@ -19,13 +19,10 @@ import { loadExpiredSources } from "@/lib/admin/expired-load";
 import { loadMeetings } from "@/lib/admin/meetings-load";
 import {
   NO_NUDGES,
-  collegeHeat,
-  employerHeat,
   meetTally,
   nudgeTallies,
   offerTally,
   stageOf,
-  studentHeat,
   type CollegeRow,
   type EmployerRow,
   type NudgeSourceRow,
@@ -35,12 +32,6 @@ import {
 
 const iso = (d: unknown) => (d ? new Date(d as string).toISOString() : null);
 const str = (v: unknown) => (v == null || v === "" ? null : String(v));
-/** The latest of some instants that are not in the future (a booked meeting next week is not "movement"). */
-function latest(now: number, ...xs: (string | null | undefined)[]): string | null {
-  let best: string | null = null;
-  for (const x of xs) if (x && Date.parse(x) <= now && (!best || x > best)) best = x;
-  return best;
-}
 
 /**
  * Nudges per target, from both sources in one statement: TPO nudges (college_nudges, always to a student) and Findtern
@@ -92,7 +83,6 @@ export async function loadOfferFacts(now: Date): Promise<OfferFact[]> {
 }
 
 export async function loadStudentRows(now: Date): Promise<StudentRow[]> {
-  const t = now.getTime();
   const db = getDb();
   const [board, cities, nudges, followUps, facts] = await Promise.all([
     loadDashboardBoard(now),
@@ -124,7 +114,6 @@ export async function loadStudentRows(now: Date): Promise<StudentRow[]> {
     const isHired = hiredOffers.length > 0;
     // Nudge is derived from the admin-nudge tally, the same rows as the Findtern nudge count.
     const followUp = followUpOf(followUps.get(s.id), tallies.get(s.id)?.lastFindtern ?? null, true);
-    const lastMoveAt = latest(t, s.lastSeenAt, s.createdAt, ...mine.map((o) => o.createdAt), ...meets.map((m) => m.startsAt));
     return {
       id: s.id, name: s.name, email: s.email, phone: s.phone, college: s.college, city: city.get(s.id) ?? null,
       accountType: s.accountType, profileComplete: s.profileComplete, profilePct: s.profilePct,
@@ -132,14 +121,12 @@ export async function loadStudentRows(now: Date): Promise<StudentRow[]> {
       offers, meetings, hired,
       lastSeenAt: s.lastSeenAt, activityHidden: s.activityHidden, online: s.online, createdAt: s.createdAt,
       stage: stageOf({ hired: isHired, offers: offers.sent, aiStatus: s.aiStatus, profileComplete: s.profileComplete }),
-      nudges: tallies.get(s.id) ?? NO_NUDGES, followUp,
-      heat: studentHeat({ unpaid: offers.unpaid, offersPending: offers.pending, meetingsUpcoming: meetings.accepted, meetingsWaiting: meetings.sent, hired: isHired, aiStatus: s.aiStatus, profileComplete: s.profileComplete, lastMoveAt, followUp }, t),
+      nudges: tallies.get(s.id) ?? NO_NUDGES, followUp
     };
   });
 }
 
 export async function loadEmployerRows(now: Date): Promise<EmployerRow[]> {
-  const t = now.getTime();
   const E = schema.employers;
   const [emps, nudges, followUps, subs, facts, meets] = await Promise.all([
     // The board's employer columns and its drive rule ("now" = the campus lock: not exited, drive on, started and not ended,
@@ -147,7 +134,7 @@ export async function loadEmployerRows(now: Date): Promise<EmployerRow[]> {
     getDb().execute(sql`
       SELECT ${E.id} AS id, ${E.companyName} AS company_name, ${E.name} AS name, ${E.companyEmail} AS company_email,
              ${E.countryCode} AS country_code, ${E.phoneNumber} AS phone_number, ${E.city} AS city,
-             ${E.internationalFteStatus} AS fte, ${E.createdAt} AS created_at, ${E.onboardingCompleted} AS onboarded,
+             ${E.internationalFteStatus} AS fte, ${E.createdAt} AS created_at,
              ${E.isActive} AS is_active, ${E.frozenAt} AS frozen_at, ${E.emailVerified} AS email_verified,
              EXISTS (SELECT 1 FROM college_drive_employers j WHERE j.employer_id = ${E.id}) AS via_drive,
              EXISTS (SELECT 1 FROM college_drive_employers j JOIN college_drives d ON d.id = j.drive_id JOIN colleges c ON c.id = d.college_id
@@ -155,7 +142,6 @@ export async function loadEmployerRows(now: Date): Promise<EmployerRow[]> {
              (SELECT count(*)::int FROM ${schema.accountStrikes} s WHERE s.user_type = 'employer' AND s.user_id = ${E.id} AND s.kind IN ('warning', 'freeze')) AS strikes,
              (SELECT count(*)::int FROM ${schema.projects} WHERE ${schema.projects.employerId} = ${E.id}) AS projects_total,
              (SELECT count(*)::int FROM ${schema.projects} WHERE ${schema.projects.employerId} = ${E.id} AND ${openProject()}) AS projects_open,
-             (SELECT max(coalesce(${schema.projects.updatedAt}, ${schema.projects.createdAt})) FROM ${schema.projects} WHERE ${schema.projects.employerId} = ${E.id}) AS project_at,
              p.last_seen_at, p.show_activity
         FROM ${E} LEFT JOIN user_presence p ON p.user_id = ${E.id}
        WHERE ${realEmployers()}
@@ -179,22 +165,19 @@ export async function loadEmployerRows(now: Date): Promise<EmployerRow[]> {
     const meetings = meetTally(mm.map((m) => m.stage));
     const frozen = f.frozen_at != null;
     const active = f.is_active !== false;
-    const onboarded = Boolean(f.onboarded);
     const projectsTotal = Number(f.projects_total ?? 0);
     const projectsOpen = Number(f.projects_open ?? 0);
     const activityHidden = f.show_activity === false;
     const lastActiveAt = activityHidden ? null : iso(f.last_seen_at);
     const createdAt = iso(f.created_at);
     const followUp = followUpOf(followUps.get(id), tallies.get(id)?.lastFindtern ?? null, true);
-    const lastMoveAt = latest(t, lastActiveAt, createdAt, iso(f.project_at), ...mine.map((o) => o.createdAt), ...mm.map((m) => m.startsAt));
     return {
       id, company: String(f.company_name ?? ""), contact: str(f.name), email: str(f.company_email),
       phone: f.phone_number ? `${f.country_code ?? ""} ${f.phone_number}`.trim() : null, city: str(f.city),
       emailVerified: Boolean(f.email_verified), fte: String(f.fte ?? "none"), active, frozen,
       strikes: Number(f.strikes ?? 0), pro: proOf.get(id) ?? "none", viaDrive: Boolean(f.via_drive), inDriveNow: Boolean(f.in_drive_now),
       projectsTotal, projectsOpen, offers, meetings,
-      lastActiveAt, activityHidden, createdAt, nudges: tallies.get(id) ?? NO_NUDGES, followUp,
-      heat: employerHeat({ active, frozen, unpaid: offers.unpaid, offersPending: offers.pending, meetingsUpcoming: meetings.accepted, openProjects: projectsOpen, offersSent: offers.sent, hires: offers.hired, onboarded, lastMoveAt, followUp }, t),
+      lastActiveAt, activityHidden, createdAt, nudges: tallies.get(id) ?? NO_NUDGES, followUp
     };
   });
 }
@@ -206,8 +189,7 @@ export async function loadEmployerRows(now: Date): Promise<EmployerRow[]> {
  * Placed, offers and not interviewed are SQL aggregates over the college's intern members with the shared rules
  * (hiredWhere, realEmployers, aiInterviewStatus: the board's "AI pending" = not applied, applied, scheduled or sent).
  */
-export async function loadCollegeRows(now: Date): Promise<CollegeRow[]> {
-  const t = now.getTime();
+export async function loadCollegeRows(): Promise<CollegeRow[]> {
   const db = getDb();
   const [raw, members, followUps] = await Promise.all([
     db.execute(sql`
@@ -217,7 +199,7 @@ export async function loadCollegeRows(now: Date): Promise<CollegeRow[]> {
             OR EXISTS (SELECT 1 FROM ${schema.collegeMemberships} m WHERE m.college_id = c.id AND m.left_at IS NULL)
             OR EXISTS (SELECT 1 FROM ${schema.collegeDrives} d WHERE d.college_id = c.id)
             OR EXISTS (SELECT 1 FROM ${schema.promoCodes} pc WHERE pc.college_id = c.id))
-      SELECT c.id, c.name, c.city, c.is_partner,
+      SELECT c.id, c.name, c.city, c.is_partner, c.created_at,
              (SELECT count(*)::int FROM ${schema.collegeMemberships} m WHERE m.college_id = c.id AND m.left_at IS NULL) AS students,
              (SELECT coalesce(sum(pc.max_usages), 0)::int FROM ${schema.promoCodes} pc WHERE pc.college_id = c.id) AS seats_bought,
              (SELECT coalesce(sum(pc.used_count), 0)::int FROM ${schema.promoCodes} pc WHERE pc.college_id = c.id) AS seats_used,
@@ -262,9 +244,9 @@ export async function loadCollegeRows(now: Date): Promise<CollegeRow[]> {
       students: Number(c.students), seatsBought: Number(c.seats_bought), seatsUsed: Number(c.seats_used),
       drives: Number(c.drives), liveDrive: Boolean(c.live_drive),
       placed: Number(a?.placed ?? 0), offers: Number(a?.offers ?? 0), notInterviewed: Number(a?.not_interviewed ?? 0),
-      lastTpoAt, nudgesSent: Number(c.nudges_sent), lastNudgeAt: iso(c.last_nudge_at), followUp,
+      lastTpoAt, nudgesSent: Number(c.nudges_sent), lastNudgeAt: iso(c.last_nudge_at), createdAt: iso(c.created_at), followUp,
     };
-    return { ...row, heat: collegeHeat({ ...row, lastMoveAt: lastTpoAt, followUp }, t) };
+    return row;
   });
 }
 
@@ -275,6 +257,6 @@ export async function loadMasterTab(tab: "students" | "employers" | "colleges", 
   return {
     students: tab === "students" ? await loadStudentRows(now) : null,
     employers: tab === "employers" ? await loadEmployerRows(now) : null,
-    colleges: tab === "colleges" ? await loadCollegeRows(now) : null,
+    colleges: tab === "colleges" ? await loadCollegeRows() : null,
   };
 }

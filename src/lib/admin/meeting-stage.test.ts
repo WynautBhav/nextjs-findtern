@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { filterMeetings, inStage, meetingStage, MEETING_STAGES, needsMeetingLink, stageCounts, type MeetingInput, type MeetingRow, type MeetingStage } from "./meeting-stage.ts";
+import { filterMeetings, inStage, meetingOutcome, meetingStage, MEETING_STAGES, needsMeetingLink, stageCounts, type MeetingInput, type MeetingRow, type MeetingStage } from "./meeting-stage.ts";
 
 const NOW = Date.parse("2026-11-28T12:00:00Z");
 const MIN = 60_000;
@@ -24,10 +24,11 @@ test("meetingStage: invites wait for a reply until they lapse", () => {
   assert.equal(meetingStage(iv("pending", { slot1: at(-90), slot2: at(-30) }), NOW), "expired");
 });
 
-test("meetingStage: decided interviews keep their meaning; declined is its own stage", () => {
+test("meetingStage: decided interviews keep their meaning; declined is expired, as MEET_STAGE says", () => {
   assert.equal(meetingStage(iv("completed", { slot1: at(-600), selectedSlot: 1 }), NOW), "completed");
   assert.equal(meetingStage(iv("missed", { slot1: at(-600), selectedSlot: 1 }), NOW), "expired");
-  assert.equal(meetingStage(iv("declined"), NOW), "declined");
+  assert.equal(meetingStage(iv("declined"), NOW), "expired");
+  assert.equal(meetingOutcome(iv("declined"), NOW), "not_accepted");
   assert.equal(meetingStage(iv("cancelled", { cancelledBy: "intern" }), NOW), "withdrawn");
   assert.equal(meetingStage(iv("cancelled", { cancelledBy: "employer" }), NOW), "withdrawn");
   // A rescheduled invite was replaced by a new one, which is the meeting: it is not counted.
@@ -39,7 +40,7 @@ test("meetingStage: drive calls", () => {
   assert.equal(meetingStage(call("requested", -30), NOW), "expired");
   assert.equal(meetingStage(call("accepted", 5), NOW), "accepted");
   assert.equal(meetingStage(call("accepted", -60), NOW), "expired");
-  assert.equal(meetingStage(call("declined", 5), NOW), "declined");
+  assert.equal(meetingStage(call("declined", 5), NOW), "expired");
   assert.equal(meetingStage(call("expired", -60), NOW), "expired");
   assert.equal(meetingStage(call("cancelled", 5), NOW), "withdrawn");
 });
@@ -65,8 +66,8 @@ test("stageCounts: every card equals the length of the list it filters, and the 
   const counts = stageCounts(rows);
   assert.equal(counts.total, rows.length);
   assert.deepEqual(
-    { sent: counts.sent, accepted: counts.accepted, completed: counts.completed, declined: counts.declined, expired: counts.expired, withdrawn: counts.withdrawn },
-    { sent: 3, accepted: 3, completed: 2, declined: 2, expired: 3, withdrawn: 1 },
+    { sent: counts.sent, accepted: counts.accepted, completed: counts.completed, expired: counts.expired, withdrawn: counts.withdrawn },
+    { sent: 3, accepted: 3, completed: 2, expired: 5, withdrawn: 1 },
   );
   for (const s of MEETING_STAGES) assert.equal(counts[s], inStage(rows, s).length, s);
   assert.equal(MEETING_STAGES.reduce((t, s) => t + counts[s], 0), counts.total);
@@ -77,7 +78,7 @@ test("stageCounts: every card equals the length of the list it filters, and the 
 
 test("filterMeetings: with filters on, each stage card still equals the rows its press shows", () => {
   const row = (id: string, stage: MeetingStage, o: Partial<MeetingRow> = {}): MeetingRow => ({
-    id, kind: "interview", stage, internId: `i-${id}`, candidate: `Student ${id}`, employerId: "e1", company: "Acme", projectId: null, project: "Backend",
+    id, kind: "interview", stage, outcome: "waiting", internId: `i-${id}`, candidate: `Student ${id}`, employerId: "e1", company: "Acme", projectId: null, project: "Backend",
     track: "internship", campus: false, driveTitle: null, round: 1, status: "scheduled", slots: [], startsAt: null, timezone: null, proposedBy: "employer",
     respondBy: null, meetingLink: null, employerJoinedAt: null, cancelledBy: null, cancelReason: null, notes: null, reason: null, feedback: null,
     proposalId: null, createdAt: `2026-11-0${id.length}T00:00:00Z`, updatedAt: null, ...o,

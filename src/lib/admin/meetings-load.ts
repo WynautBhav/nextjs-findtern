@@ -9,7 +9,8 @@ import { getDb, schema } from "@/lib/db";
 import { realEmployers } from "@/lib/admin/scope";
 import { MEETING_MINUTES as CALL_MINUTES } from "@/lib/college/constants";
 import { meetingDetail } from "@/lib/admin/dashboard-board-pure";
-import { meetingStage, pickedSlot, type MeetingRow } from "@/lib/admin/meeting-stage";
+import { meetingOutcome, pickedSlot, type MeetingRow } from "@/lib/admin/meeting-stage";
+import { MEET_STAGE } from "@/lib/college/meet-outcome";
 import { meetingTrack } from "@/lib/admin/offer-track";
 
 export type { MeetingRow };
@@ -90,12 +91,13 @@ export async function loadMeetings(now: Date = new Date()): Promise<{ rows: Meet
       kind: "interview" as const, status: String(r.status ?? ""), slot1: date(r.slot1), slot2: date(r.slot2), slot3: date(r.slot3),
       selectedSlot: r.selected_slot == null ? null : Number(r.selected_slot), respondBy: date(r.respond_by), cancelledBy: str(r.cancelled_by),
     };
-    const stage = meetingStage(m, NOW);
-    if (stage === null) continue;
+    const outcome = meetingOutcome(m, NOW);
+    if (outcome === null) continue;
+    const stage = MEET_STAGE[outcome];
     // Type: the linked offer, else the matched campus drive's kind, else Internship; the project's flag is the employer's "full-time after the internship" answer (offer-track.ts).
     const { track, ftAfterInternship } = meetingTrack(r.proposal_id ? { offerDetails: r.offer_details, currency: str(r.currency) } : null, str(r.cd_kind), r.full_time_offer === true);
     rows.push({
-      id: String(r.id), kind: "interview", stage, internId: String(r.intern_id), candidate: nameOf(r), employerId: String(r.employer_id),
+      id: String(r.id), kind: "interview", stage, outcome, internId: String(r.intern_id), candidate: nameOf(r), employerId: String(r.employer_id),
       company: String(r.company_name ?? ""), projectId: str(r.project_id), project: str(r.project_name), track, ftAfterInternship,
       campus: r.campus === true, driveTitle: str(r.drive_title), round: r.round == null ? null : Number(r.round), status: m.status,
       slots: [m.slot1, m.slot2, m.slot3].filter((d): d is Date => d !== null).map((d) => d.toISOString()), startsAt: iso(pickedSlot(m)),
@@ -107,10 +109,11 @@ export async function loadMeetings(now: Date = new Date()): Promise<{ rows: Meet
   }
   for (const r of calls) {
     const status = String(r.status ?? "");
-    const stage = meetingStage({ kind: "call", status, startsAt: date(r.starts_at), cancelledBy: null }, NOW);
-    if (stage === null) continue;
+    const outcome = meetingOutcome({ kind: "call", status, startsAt: date(r.starts_at), cancelledBy: null }, NOW);
+    if (outcome === null) continue;
+    const stage = MEET_STAGE[outcome];
     rows.push({
-      id: String(r.id), kind: "call", stage, internId: String(r.user_id), candidate: nameOf(r), employerId: String(r.employer_id),
+      id: String(r.id), kind: "call", stage, outcome, internId: String(r.user_id), candidate: nameOf(r), employerId: String(r.employer_id),
       company: String(r.company_name ?? ""), projectId: null, project: null, track: r.drive_kind === "full_time" ? "full_time" : "internship", ftAfterInternship: false,
       campus: true, driveTitle: str(r.drive_title), round: null, status, slots: r.starts_at ? [iso(r.starts_at)!] : [], startsAt: iso(r.starts_at),
       timezone: null, proposedBy: "employer", respondBy: null, meetingLink: str(r.meeting_link), employerJoinedAt: null, cancelledBy: null,

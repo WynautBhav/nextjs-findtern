@@ -4,7 +4,7 @@ import { csvText, tableCsv } from "@/components/admin/dashboard/board/table-csv"
 import { parseSort } from "@/components/admin/data-table";
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { csvFilename, csvResponse } from "@/lib/admin/csv";
-import { listMeetings, meetingCsvRow, MEETING_COLUMNS, MEETING_SORTS } from "@/lib/admin/meeting-stage";
+import { listMeetings, meetingCsvRow, MEETING_COLUMNS, MEETING_DEFAULT_SORT, MEETING_SORTS } from "@/lib/admin/meeting-stage";
 import { loadMeetings } from "@/lib/admin/meetings-load";
 import { flattenParams } from "@/lib/admin/params";
 import { allows, requiredPermissions } from "@/lib/admin/permissions";
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
   }
 
   const params = flattenParams(Object.fromEntries(new URL(req.url).searchParams.entries()));
-  const sort = parseSort(params, MEETING_SORTS, { key: "created", dir: "desc" });
+  const sort = parseSort(params, MEETING_SORTS, MEETING_DEFAULT_SORT);
   const { listed } = listMeetings((await loadMeetings()).rows, params, sort);
 
   try {

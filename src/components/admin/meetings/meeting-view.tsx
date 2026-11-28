@@ -9,9 +9,10 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { buttonClass } from "@/components/ui/button";
 import { formatIst } from "@/lib/format";
-import { MEETING_STAGE_LABEL, sourceLabel, TRACK_LABEL, type MeetingRow } from "@/lib/admin/meeting-stage";
+import { feedbackOrReason, sourceLabel, statusText, TRACK_LABEL, zoneNote, type MeetingRow } from "@/lib/admin/meeting-stage";
 import { cn } from "@/lib/utils";
 
+import { Slots } from "./slots";
 import { STAGE_TONE } from "./stage-tone";
 
 const WHO: Record<string, string> = { employer: "The employer", intern: "The student", admin: "Findtern" };
@@ -22,6 +23,7 @@ export function MeetingView({ row, canEditLink }: { row: MeetingRow; canEditLink
   const [open, setOpen] = useState(false);
   const isCall = row.kind === "call";
   const picked = row.startsAt;
+  const detail = feedbackOrReason(row);
   // A meeting that is over (or never will be) keeps its link as it is; the server also refuses a link before a slot is picked.
   const finished = row.stage !== "sent" && row.stage !== "accepted";
 
@@ -58,7 +60,7 @@ export function MeetingView({ row, canEditLink }: { row: MeetingRow; canEditLink
               {row.project ? ` · ${row.project}` : ""}
             </DialogDescription>
             <div className="mt-4 flex flex-wrap gap-2">
-              <StatusBadge {...STAGE_TONE[row.stage]} label={MEETING_STAGE_LABEL[row.stage]} className="bg-white text-[#0a3a2c]" />
+              <StatusBadge {...STAGE_TONE[row.stage]} label={statusText(row)} className="bg-white text-[#0a3a2c]" />
               <span className="inline-flex h-6 items-center rounded-full bg-white/10 px-2.5 text-xs font-medium">{TRACK_LABEL[row.track]}</span>
               <span className="inline-flex h-6 items-center rounded-full bg-white/10 px-2.5 text-xs font-medium">
                 {sourceLabel(row)}
@@ -69,24 +71,12 @@ export function MeetingView({ row, canEditLink }: { row: MeetingRow; canEditLink
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
             <Section title="When">
-              <Field label={isCall ? "Starts" : "Picked slot"}>{when(picked) ?? <Muted>No slot picked yet</Muted>}</Field>
-              {!isCall ? (
-                <Field label="Slots offered">
-                  {row.slots.length ? (
-                    <ul className="space-y-1">
-                      {row.slots.map((s) => (
-                        <li key={s} className="nums">
-                          {when(s)}
-                          {s === picked ? <span className="ml-2 text-xs font-medium text-brand-700">Picked</span> : null}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <Muted>None</Muted>
-                  )}
-                </Field>
-              ) : null}
-              {!isCall ? <Field label="Time zone">{row.timezone ?? <Muted>Not set (shown in IST)</Muted>}</Field> : null}
+              <Field label={isCall ? "Call time" : "Slots offered"}>
+                <Slots row={row} className="-ml-2" showZone={false} />
+              </Field>
+              <Field label="Time zone">
+                {isCall ? "IST. Drive calls are always set in India time." : (zoneNote(row)?.replace("Meeting time zone: ", "") ?? (row.timezone ? `${row.timezone} (IST)` : <Muted>Not set, so IST</Muted>))}
+              </Field>
               {!isCall ? <Field label="Proposed by">{row.proposedBy ? (WHO[row.proposedBy] ?? row.proposedBy) : <Muted>Not recorded</Muted>}</Field> : null}
               {!isCall ? <Field label="Respond by">{when(row.respondBy) ?? <Muted>No deadline</Muted>}</Field> : null}
             </Section>
@@ -106,10 +96,9 @@ export function MeetingView({ row, canEditLink }: { row: MeetingRow; canEditLink
                 )}
               </Field>
               {!isCall ? <Field label="Employer joined">{when(row.employerJoinedAt) ?? <Muted>Not joined</Muted>}</Field> : null}
-              {row.stage === "withdrawn" ? <Field label="Withdrawn">{row.reason}</Field> : null}
-              {row.stage === "completed" ? (
-                <Field label="Employer feedback">
-                  <span className="whitespace-pre-line">{row.feedback}</span>
+              {detail ? (
+                <Field label={row.stage === "completed" ? "Employer feedback" : row.stage === "withdrawn" ? "Cancellation reason" : "Reason"}>
+                  <span className="whitespace-pre-line">{detail}</span>
                 </Field>
               ) : null}
               {row.notes?.trim() ? (

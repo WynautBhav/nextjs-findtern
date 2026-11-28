@@ -13,18 +13,26 @@ import { DateRangeForm } from "@/components/admin/date-range-form";
 import { PayoutRunDesk } from "@/components/admin/payouts/payout-run-desk";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { HeatGuide } from "@/components/admin/heat/heat-guide";
+import { HeatMark } from "@/components/admin/heat/heat-mark";
+import type { Heat } from "@/lib/admin/heat";
+import { PAYOUT_HEAT_GUIDE, parseHeatBand } from "@/lib/admin/payout-heat";
 import { flattenParams, parsePageRequest, toQueryString, type RawSearchParams } from "@/lib/admin/params";
 import {
   DUE_FILTERS,
+  DUE_SORTS,
+  dueHeatView,
   duesTotals,
   filterDues,
+  heatDues,
   loadPayouts,
+  loadPayoutsWithHeat,
   loadPlacementDues,
-  PAYOUT_SORTS,
+  PAYOUT_LIST_SORTS,
   payoutSourceLabel,
   type DueFilter,
-  type PayoutRow,
-  type PlacementDueRow,
+  type HeatedDueRow,
+  type HeatedPayoutRow,
 } from "@/lib/admin/payout-list";
 import { buildPayoutRun, istDayKey, type PayoutRun } from "@/lib/admin/payout-run";
 import { payoutKindLabel } from "@/lib/admin/payout-kind";
@@ -40,6 +48,35 @@ const BASE = "/admin/payouts";
 /** One read of the placement dues per request: the run desk and the dues tab share it. */
 const loadDuesOnce = cache(loadPlacementDues);
 const inr = (minor: number) => formatMoney(minor, "INR", { zeroLabel: "₹0" });
+
+/** The Heat filter, the same on both tabs. */
+const HEAT_FILTER = {
+  key: "heat",
+  label: "Heat",
+  allLabel: "Any heat",
+  options: [
+    { value: "hot", label: "Hot" },
+    { value: "warm", label: "Warm" },
+    { value: "calm", label: "Calm" },
+    { value: "closed", label: "Closed" },
+  ],
+};
+
+/** The Heat cell: the mark, or a dash for a row with nothing left to do. */
+function HeatCell({ heat, id }: { heat: Heat | null; id: string }) {
+  return heat ? (
+    <HeatMark heat={heat} id={id} />
+  ) : (
+    <span className="text-text-subtle" title="Closed: nothing to do">
+      –<span className="sr-only">Closed: nothing to do</span>
+    </span>
+  );
+}
+
+/** Heat column: first click sorts hottest first. */
+function heatColumn<T extends { heat: Heat | null }>(idOf: (r: T) => string): Column<T> {
+  return { header: "Heat", sort: "heat", firstDir: "desc", className: "whitespace-nowrap", cell: (r) => <HeatCell heat={r.heat} id={idOf(r)} /> };
+}
 
 /**
  * Money out to interns.
@@ -118,11 +155,12 @@ function RunDeskSkeleton() {
 async function PayoutsView({ params }: { params: Record<string, string> }) {
   const canPay = allows((await getSession())?.permissions, ["transactions:write"]);
   const req = parsePageRequest(params);
-  const sort = parseSort(params, PAYOUT_SORTS, { key: "scheduled", dir: "desc" });
+  // Default: hottest first, then paid and other closed rows newest first.
+  const sort = parseSort(params, PAYOUT_LIST_SORTS, { key: "heat", dir: "desc" });
 
-  let data: Awaited<ReturnType<typeof loadPayouts>>;
+  let data: Awaited<ReturnType<typeof loadPayoutsWithHeat>>;
   try {
-    data = await loadPayouts(params, { offset: req.offset, limit: req.perPage, sort: sort.key, dir: sort.dir });
+    data = await loadPayoutsWithHeat(params, { offset: req.offset, limit: req.perPage, sort: sort.key, dir: sort.dir });
   } catch (e) {
     console.error("[admin/payouts]", e);
     return (
@@ -134,13 +172,13 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
 
   const pages = Math.max(1, Math.ceil(data.total / req.perPage));
   const exportParams = Object.fromEntries(Object.entries(params).filter(([k]) => !["tab", "page", "per"].includes(k)));
-  const filtered = Boolean(params.q || params.status || params.currency || params.from || params.to);
+  const filtered = Boolean(params.q || params.status || params.currency || params.from || params.to || parseHeatBand(params.heat));
 
   // Six columns, so the action (record the bank reference: the screen's job)
   // is always on screen at 1440. Company and project, the INR value of a USD
   // payout and the source ride as second lines instead of their own columns,
   // and "Not linked" is simply absent (critique P0, QA-103).
-  const columns: Column<PayoutRow>[] = [
+  const columns: Column<HeatedPayoutRow>[] = [
     {
       header: "Intern",
       cell: (r) => (
@@ -194,6 +232,7 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
         </span>
       ),
     },
+    heatColumn<HeatedPayoutRow>((r) => r.id),
     {
       header: "Reference",
       className: "nums",
@@ -247,7 +286,9 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
         />
       </dl>
 
-      <DataTable<PayoutRow>
+      <HeatGuide guide={PAYOUT_HEAT_GUIDE} />
+
+      <DataTable<HeatedPayoutRow>
         basePath={BASE}
         params={params}
         page={Math.min(req.page, pages)}
@@ -277,6 +318,7 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
               { value: "USD", label: "USD" },
             ],
           },
+          HEAT_FILTER,
         ]}
         extraControls={<DateRange params={params} />}
         exportHref={`/api/admin/payouts/export${toQueryString({ ...exportParams, view: "payouts" })}`}
@@ -316,7 +358,7 @@ async function DuesView({ params }: { params: Record<string, string> }) {
   const req = parsePageRequest(params);
   const filter = (DUE_FILTERS as readonly string[]).includes(params.due ?? "") ? (params.due as DueFilter) : "all";
 
-  let all: PlacementDueRow[];
+  let all: Awaited<ReturnType<typeof loadPlacementDues>>;
   try {
     all = await loadDuesOnce();
   } catch (e) {
@@ -329,16 +371,30 @@ async function DuesView({ params }: { params: Record<string, string> }) {
   }
 
   const rows = filterDues(all, filter, params.q ?? "");
+  // The cards count the placements before the heat filter; the table shows the heat filter and order.
   const totals = duesTotals(rows);
-  const pages = Math.max(1, Math.ceil(rows.length / req.perPage));
+  const band = parseHeatBand(params.heat);
+  const sort = parseSort(params, DUE_SORTS, { key: "heat", dir: "desc" });
+  let listed: HeatedDueRow[];
+  try {
+    listed = dueHeatView(await heatDues(rows), band, sort.key, sort.dir);
+  } catch (e) {
+    console.error("[admin/payouts dues heat]", e);
+    return (
+      <Panel>
+        <AdminLoadError what="placement dues" retryHref={`${BASE}${toQueryString(params)}`} />
+      </Panel>
+    );
+  }
+  const pages = Math.max(1, Math.ceil(listed.length / req.perPage));
   const page = Math.min(req.page, pages);
-  const shown = rows.slice((page - 1) * req.perPage, page * req.perPage);
-  const filtered = Boolean(params.q || params.due);
-  const exportParams = Object.fromEntries(Object.entries(params).filter(([k]) => ["q", "due"].includes(k)));
+  const shown = listed.slice((page - 1) * req.perPage, page * req.perPage);
+  const filtered = Boolean(params.q || params.due || band);
+  const exportParams = Object.fromEntries(Object.entries(params).filter(([k]) => ["q", "due", "heat", "sort", "dir"].includes(k)));
 
   // Five columns (ten ran 220px past 1440): who and where, the stipend and
   // months paid, what is still due against the total.
-  const columns: Column<PlacementDueRow>[] = [
+  const columns: Column<HeatedDueRow>[] = [
     {
       header: "Placement",
       cell: (d) => (
@@ -391,8 +447,11 @@ async function DuesView({ params }: { params: Record<string, string> }) {
         </span>
       ),
     },
+    heatColumn<HeatedDueRow>((d) => d.proposalId),
     {
       header: "Next payment",
+      sort: "next",
+      firstDir: "asc",
       className: "nums whitespace-nowrap",
       cell: (d) =>
         d.pending ? (
@@ -439,12 +498,14 @@ async function DuesView({ params }: { params: Record<string, string> }) {
         <StatCard label="Employers still owe" value={inr(totals.employerDueInrMinor)} hint="Stipend base, before fee and GST · USD at ₹100/$" />
       </StatGrid>
 
-      <DataTable<PlacementDueRow>
+      <HeatGuide guide={PAYOUT_HEAT_GUIDE} />
+
+      <DataTable<HeatedDueRow>
         basePath={BASE}
         params={params}
         page={page}
         pages={pages}
-        total={rows.length}
+        total={listed.length}
         perPage={req.perPage}
         rows={shown}
         columns={columns}
@@ -462,6 +523,7 @@ async function DuesView({ params }: { params: Record<string, string> }) {
               { value: "completed", label: "Completed" },
             ],
           },
+          HEAT_FILTER,
         ]}
         exportHref={`/api/admin/payouts/export${toQueryString({ ...exportParams, view: "dues" })}`}
         empty={

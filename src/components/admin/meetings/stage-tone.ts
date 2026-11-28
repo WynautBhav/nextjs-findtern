@@ -6,7 +6,6 @@ export const STAGE_TONE: Record<MeetingStage, { tone: StatusTone }> = {
   sent: { tone: "warning" },
   accepted: { tone: "info" },
   completed: { tone: "success" },
-  declined: { tone: "danger" },
   expired: { tone: "neutral" },
   withdrawn: { tone: "neutral" },
 };

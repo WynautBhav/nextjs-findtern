@@ -9,7 +9,7 @@ import { useConfirm } from "@/components/app/use-confirm";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { csrfFetch } from "@/lib/client-fetch";
 import { FOLLOW_UP_NOTE_MAX, historyText, type CallNo } from "@/lib/admin/follow-ups";
-import { HEAT_LABEL, TAB_TARGET, nudgeBreakdown, type AnyRow, type ColumnDef, type TabKey } from "@/lib/admin/master-data-pure";
+import { TAB_TARGET, nudgeBreakdown, type AnyRow, type ColumnDef, type TabKey } from "@/lib/admin/master-data-pure";
 import { istStamp } from "@/lib/college/master-row";
 import { cn } from "@/lib/utils";
 
@@ -19,12 +19,12 @@ type History = { status: string; note: string | null; at: string; by: string | n
 
 const FIELD = "w-full rounded-xl border border-ink-200 bg-background px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring";
 const BTN = "inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50 touch:h-11";
-const HIDE = new Set(["name", "company", "heat", "followUp", "followUpNote", "followUpAt"]);
+const HIDE = new Set(["name", "company", "followUp", "followUpNote", "followUpAt"]);
 
 export type DrawerRecord = { row: AnyRow; title: string; sub: string; href: string | null };
 
 /**
- * One record, every field: why it is hot, its follow-up marks (Nudge automatic; Call 1 and Call 2 ticked here with an
+ * One record, every field: its follow-up marks (Nudge automatic; Call 1 and Call 2 ticked here with an
  * optional note, each a new log row), its nudges (TPO and Findtern) and the call history. Side sheet with the dashboard drawer's deep green head.
  */
 export function RecordDrawer({ tab, record, columns, canWrite, canNudge, onClose }: { tab: TabKey; record: DrawerRecord | null; columns: ColumnDef<AnyRow>[]; canWrite: boolean; canNudge: boolean; onClose: () => void }) {
@@ -129,11 +129,6 @@ function Body({ tab, record, columns, canWrite, canNudge }: { tab: TabKey; recor
             <span className="sr-only">Close</span>
           </SheetClose>
         </div>
-        <p className="mt-4 flex flex-wrap items-baseline gap-x-2 text-sm">
-          <span className="nums text-[2rem] font-semibold leading-none tracking-[-0.03em]">{row.heat.score}</span>
-          <span className="font-medium">{HEAT_LABEL[row.heat.level]}</span>
-          <span className="text-[#a9cbbd]">{row.heat.why}</span>
-        </p>
         {record.href ? (
           <Link href={record.href} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-white/10 px-3.5 text-sm font-medium text-[#f2faf6] transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white touch:h-11">
             Open full record <ArrowUpRight className="size-4" aria-hidden />

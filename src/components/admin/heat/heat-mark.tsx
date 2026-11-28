@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { HEAT_LABEL, type Heat } from "@/lib/admin/master-data-pure";
+import { HEAT_LABEL, type Heat } from "@/lib/admin/heat";
 
 /**
  * Heat as three steps: filled bars (1 calm, 2 warm, 3 hot) and the word with its score, so the level never rests on

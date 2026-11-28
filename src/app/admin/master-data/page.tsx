@@ -4,7 +4,7 @@ import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { MasterDataView } from "@/components/admin/master-data/master-data-view";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { loadMasterTab, type MasterData } from "@/lib/admin/master-data";
-import { COLLEGE_FILTERS, EMPLOYER_FILTERS, STUDENT_FILTERS, countWhere, type AnyRow, type FilterDef, type TabKey } from "@/lib/admin/master-data-pure";
+import { COLLEGE_FILTERS, EMPLOYER_FILTERS, STUDENT_FILTERS, countWhere, kpisFor, type AnyRow, type FilterDef, type TabKey } from "@/lib/admin/master-data-pure";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { allows, canWrite, requiredPermissions } from "@/lib/admin/permissions";
 import { getSession } from "@/lib/auth";
@@ -19,14 +19,13 @@ const TABS: { key: TabKey; label: string; page: string; one: string; many: strin
 ];
 const FILTERS = { students: STUDENT_FILTERS, employers: EMPLOYER_FILTERS, colleges: COLLEGE_FILTERS } as unknown as Record<TabKey, FilterDef<AnyRow>[]>;
 
-/** Request time for heat and "last seen". Dynamic page, so this is per request. */
+/** Request time for "last seen". Dynamic page, so this is per request. */
 function requestTime(): Date {
   return new Date();
 }
 
 /**
- * Every student, employer and college in one place, ranked by heat (what is at stake and how long it has been quiet),
- * with the admin's follow-up log. A tab shows only when this admin may open that kind of record's own page.
+ * Every student, employer and college in one place, newest first, with the follow-up marks (Nudge, Call 1, Call 2). A tab shows only when this admin may open that kind of record's own page.
  */
 export default async function MasterDataPage({ searchParams }: { searchParams?: Promise<RawSearchParams> }) {
   const params = flattenParams(await searchParams);
@@ -61,13 +60,12 @@ export default async function MasterDataPage({ searchParams }: { searchParams?: 
   }
 
   const rows = (data[tab.key] ?? []) as AnyRow[];
-  const hot = countWhere(rows, FILTERS[tab.key], { heat: "hot" });
-  const hotOpen = countWhere(rows, FILTERS[tab.key], { heat: "hot", followUp: "nothing" });
+  // The finding: how many have had no follow-up yet (the first follow-up card's own filter, so the line equals the card).
+  const open = kpisFor(tab.key)[1];
+  const waiting = countWhere(rows, FILTERS[tab.key], open.filters);
   const finding = rows.length === 0
     ? `No ${tab.many} yet.`
-    : hot === 0
-      ? `${rows.length.toLocaleString("en-IN")} ${rows.length === 1 ? tab.one : tab.many}, none hot right now.`
-      : `${hot.toLocaleString("en-IN")} hot ${hot === 1 ? tab.one : tab.many}${hotOpen ? `, ${hotOpen.toLocaleString("en-IN")} not nudged or called yet` : ", all followed up"}. Highest first.`;
+    : `${rows.length.toLocaleString("en-IN")} ${rows.length === 1 ? tab.one : tab.many}, ${waiting.toLocaleString("en-IN")} ${open.label.toLowerCase()}. Newest first.`;
 
   const items: AdminTabItem[] = allowed.map((t) => ({ key: t.key, label: t.label, href: `/admin/master-data?tab=${t.key}` }));
   const write = canWrite(perms, "/api/admin/follow-ups") && canWrite(perms, tab.page);

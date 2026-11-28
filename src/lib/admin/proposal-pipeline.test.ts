@@ -74,10 +74,11 @@ test("PPO needs a full-time offer with a base proposal", () => {
 });
 
 test("CSV writes the on-screen columns and neutralises formulas", () => {
-  const t = pipelineCsv([{ candidate: "=cmd", employer: "Acme, Inc", project: "Web", type: "Internship proposal", outcome: "Pending", created: "1 Nov 2026", pay: "₹10,000/mo" }]);
-  assert.deepEqual(t[0], ["Candidate", "Employer", "Project or role", "Type", "Outcome", "Created", "Pay"]);
-  assert.equal(t[1][0], "'=cmd");
-  assert.equal(t[1][1], '"Acme, Inc"');
+  const t = pipelineCsv([{ heat: "Hot 82: Starts in 2 days", candidate: "=cmd", employer: "Acme, Inc", project: "Web", type: "Internship proposal", outcome: "Pending", created: "1 Nov 2026", pay: "₹10,000/mo" }]);
+  assert.deepEqual(t[0], ["Heat", "Candidate", "Employer", "Project or role", "Type", "Outcome", "Created", "Pay"]);
+  assert.equal(t[1][0], "Hot 82: Starts in 2 days");
+  assert.equal(t[1][1], "'=cmd");
+  assert.equal(t[1][2], '"Acme, Inc"');
 });
 
 test("Pay is the intern's stipend (not the employer's monthly amount), or the CTC", () => {

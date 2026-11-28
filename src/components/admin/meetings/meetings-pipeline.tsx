@@ -2,18 +2,24 @@ import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-tabl
 import { ExportCsv } from "./export-csv";
 import { MeetingView } from "./meeting-view";
 import { StageCards, type StageCard } from "./stage-cards";
+import { Slots } from "./slots";
 import { STAGE_TONE } from "./stage-tone";
 import { AdminLoadError, Panel } from "@/components/admin/panel";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { HeatGuide } from "@/components/admin/heat/heat-guide";
+import { HeatMark } from "@/components/admin/heat/heat-mark";
+import { MEETING_HEAT_GUIDE } from "@/lib/admin/meeting-heat";
 import { getSession } from "@/lib/auth";
 import { formatDate, formatNumber } from "@/lib/format";
 import {
   inStage,
   listMeetings,
+  MEETING_DEFAULT_SORT,
   MEETING_SORTS,
   MEETING_STAGE_LABEL,
   MEETING_STAGES,
-  scheduledText,
+  EXPIRED_WHY,
+  feedbackOrReason,
   sourceLabel,
   TRACK_LABEL,
   type MeetingStage,
@@ -37,15 +43,14 @@ const HINT: Record<MeetingStage | "total", string> = {
   sent: "No slot picked yet",
   accepted: "Booked, still to come",
   completed: "Marked done",
-  declined: "Someone said no",
-  expired: "Lapsed or never marked",
+  expired: "Not accepted, missed or never marked",
   withdrawn: "Called off",
 };
-const DOT: Partial<Record<MeetingStage, string>> = { sent: "bg-warning", accepted: "bg-info", completed: "bg-success", declined: "bg-danger" };
+const DOT: Partial<Record<MeetingStage, string>> = { sent: "bg-warning", accepted: "bg-info", completed: "bg-success" };
 
 export async function MeetingsPipeline({ params }: { params: Record<string, string> }) {
   const req = parsePageRequest(params);
-  const sort = parseSort(params, MEETING_SORTS, { key: "created", dir: "desc" });
+  const sort = parseSort(params, MEETING_SORTS, MEETING_DEFAULT_SORT);
   const session = await getSession();
   const canEditLink = canWrite(session?.permissions, "/api/admin/interviews");
 
@@ -71,7 +76,7 @@ export async function MeetingsPipeline({ params }: { params: Record<string, stri
     { key: "total", label: "Total", count: counts.total, hint: HINT.total },
     ...MEETING_STAGES.map((s) => ({ key: s, label: MEETING_STAGE_LABEL[s], count: counts[s], hint: HINT[s], dot: DOT[s] })),
   ];
-  const filtered = Boolean(req.search || params.type || params.source || params.company || stage || nolink);
+  const filtered = Boolean(req.search || params.type || params.source || params.company || params.heat || stage || nolink);
 
   return (
     <div className="space-y-4">
@@ -83,6 +88,8 @@ export async function MeetingsPipeline({ params }: { params: Record<string, stri
       </div>
 
       <StageCards cards={cards} active={stage} noLink={{ count: noLinkCount, on: nolink }} />
+
+      <HeatGuide guide={MEETING_HEAT_GUIDE} />
 
       <DataTable
         basePath={PATH}
@@ -105,6 +112,7 @@ export async function MeetingsPipeline({ params }: { params: Record<string, stri
           { key: "type", label: "Meeting type", allLabel: "All types", options: [{ value: "internship", label: "Internship" }, { value: "full_time", label: "Full-time" }] },
           { key: "source", label: "Source", allLabel: "Campus and direct", options: [{ value: "campus", label: "Campus drive" }, { value: "direct", label: "Direct" }] },
           { key: "company", label: "Company", allLabel: "All companies", options: companies.map(([value, label]) => ({ value, label })) },
+          { key: "heat", label: "Heat", allLabel: "Any heat", options: [{ value: "hot", label: "Hot" }, { value: "warm", label: "Warm" }, { value: "calm", label: "Calm" }, { value: "closed", label: "Closed" }] },
         ]}
         columns={[
           {
@@ -129,12 +137,41 @@ export async function MeetingsPipeline({ params }: { params: Record<string, stri
             ),
           },
           { header: "Round", numeric: true, cell: (r) => (r.round == null ? <span className="text-text-subtle">-</span> : r.round) },
-          { header: "Status", cell: (r) => <StatusBadge {...STAGE_TONE[r.stage]} label={MEETING_STAGE_LABEL[r.stage]} /> },
           {
-            header: "Scheduled",
-            sort: "scheduled",
-            firstDir: "asc",
-            cell: (r) => <span className={r.startsAt ? "nums whitespace-nowrap" : "whitespace-nowrap text-text-subtle"}>{scheduledText(r)}</span>,
+            header: "Status",
+            cell: (r) => (
+              <div className="min-w-0">
+                <StatusBadge {...STAGE_TONE[r.stage]} label={MEETING_STAGE_LABEL[r.stage]} />
+                {r.stage === "expired" && EXPIRED_WHY[r.outcome] ? <p className="mt-1 whitespace-nowrap text-[0.8125rem] text-text-subtle">{EXPIRED_WHY[r.outcome]}</p> : null}
+              </div>
+            ),
+          },
+          {
+            header: "Heat",
+            sort: "heat",
+            firstDir: "desc",
+            cell: (r) =>
+              r.heat ? (
+                <HeatMark heat={r.heat} id={r.id} />
+              ) : (
+                <span className="text-text-subtle" title="Closed: nothing to do">
+                  –<span className="sr-only">Closed: nothing to do</span>
+                </span>
+              ),
+          },
+          { header: "Slots", sort: "scheduled", firstDir: "asc", cell: (r) => <Slots row={r} className="-ml-2" /> },
+          {
+            header: "Feedback or reason",
+            cell: (r) => {
+              const text = feedbackOrReason(r);
+              return text ? (
+                <p className="line-clamp-2 min-w-48 max-w-64 whitespace-normal break-words text-[0.8125rem]" title={text}>
+                  {text}
+                </p>
+              ) : (
+                <span className="text-text-subtle">–</span>
+              );
+            },
           },
           { header: "Created", sort: "created", cell: (r) => <span className="nums whitespace-nowrap text-text-subtle">{formatDate(r.createdAt)}</span> },
           { header: "", label: "", cell: (r) => <MeetingView row={r} canEditLink={canEditLink} /> },

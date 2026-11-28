@@ -56,7 +56,7 @@ export function StageCards({
         role="group"
         aria-label="Meetings by stage"
         aria-busy={pending}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"
       >
         {cards.map((c) => {
           const on = c.key === "total" ? active === "" : active === c.key;
@@ -67,7 +67,6 @@ export function StageCards({
               aria-pressed={on}
               onClick={() => pick(c.key)}
               className={cn(
-                c.key === "total" && "max-sm:col-span-2",
                 "group flex min-w-0 flex-col justify-start rounded-[var(--radius-admin-card)] border p-4 text-left transition-colors duration-150 motion-reduce:transition-none",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                 on

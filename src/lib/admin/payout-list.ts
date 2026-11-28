@@ -9,6 +9,10 @@ import { searchAny } from "@/lib/admin/params";
 import { isHiredProposal } from "@/lib/hire-status";
 import { stipendDues, type StipendDue } from "@/lib/admin/stipend-dues";
 import { SETTLED_STATUSES, settledOrders } from "@/lib/refund-accounting";
+import { canPayOut } from "@/lib/admin/payout-kind";
+import { istDayKey } from "@/lib/admin/payout-run";
+import { bandCounts, duesHeatInput, heatBand, heatPageSplit, isOpenDue, ledgerHeatInput, parseHeatBand, payoutHeat, sortByHeat, type HeatBand } from "@/lib/admin/payout-heat";
+import type { Heat } from "@/lib/admin/heat";
 
 /**
  * The two lists on /admin/payouts, shared with their CSV export so the file
@@ -79,10 +83,14 @@ export type PayoutRow = Awaited<ReturnType<typeof loadPayouts>>["rows"][number];
 
 export async function loadPayouts(
   params: Record<string, string>,
-  page: { offset: number; limit: number; sort: PayoutSort; dir: "asc" | "desc" },
+  /** `limit: null` reads every matching row (the open set for heat). */
+  page: { offset: number; limit: number | null; sort: PayoutSort; dir: "asc" | "desc" },
+  /** Heat split: "open" = still to be paid (pending), "closed" = everything else. */
+  scope?: "open" | "closed",
 ) {
   const db = getDb();
-  const where = payoutWhere(params);
+  const open = sql`lower(${schema.internPayouts.status}) = 'pending'`; // isOpenPayout
+  const where = scope ? and(payoutWhere(params), scope === "open" ? open : sql`not (${open})`) : payoutWhere(params);
   const base = () =>
     db
       .select({
@@ -117,12 +125,9 @@ export async function loadPayouts(
       )
       .leftJoin(payoutProject, eq(payoutProject.id, payoutProposal.projectId));
 
+  const ordered = () => base().where(where).orderBy(...payoutSort(page.sort, page.dir));
   const [rows, [totals]] = await Promise.all([
-    base()
-      .where(where)
-      .orderBy(...payoutSort(page.sort, page.dir))
-      .limit(page.limit)
-      .offset(page.offset),
+    page.limit === null ? ordered().offset(page.offset) : ordered().limit(page.limit).offset(page.offset),
     db
       .select({
         count: sql<number>`count(*)::int`,
@@ -326,3 +331,93 @@ export async function loadLedgerByIntern(): Promise<Map<string, { pendingMinor: 
     .groupBy(schema.internPayouts.internId);
   return new Map(rows.map((r) => [r.internId, { pendingMinor: Number(r.pendingMinor), paidMinor: Number(r.paidMinor) }]));
 }
+
+/* ── Heat (payout-heat.ts): which unpaid stipends to deal with first ── */
+
+/**
+ * canPayOut's reason per intern (null = bank details on file), the same check the mark-paid route enforces. Read only
+ * for the interns with an open row; the bank details themselves never leave this function.
+ */
+export async function loadBankProblems(internIds: string[]): Promise<Map<string, string | null>> {
+  const ids = [...new Set(internIds)].filter(Boolean);
+  const out = new Map<string, string | null>(ids.map((id) => [id, "Intern has no bank details on file"]));
+  if (!ids.length) return out;
+  const rows = await getDb()
+    .select({ userId: schema.internOnboarding.userId, extraData: schema.internOnboarding.extraData })
+    .from(schema.internOnboarding)
+    .where(inArray(schema.internOnboarding.userId, ids));
+  for (const r of rows) {
+    const ok = canPayOut((r.extraData ?? {}) as Record<string, unknown>);
+    out.set(r.userId, ok.ok ? null : ok.error);
+  }
+  return out;
+}
+
+export const PAYOUT_LIST_SORTS = ["heat", ...PAYOUT_SORTS] as const;
+export type PayoutListSort = (typeof PAYOUT_LIST_SORTS)[number];
+export type HeatedPayoutRow = PayoutRow & { heat: Heat | null };
+
+
+/**
+ * The payouts ledger with heat, for the page, its CSV and the verify script. Open (pending) rows are all read and
+ * scored; closed rows stay paginated in SQL. `params.heat` (hot | warm | calm | closed) filters; sort "heat" puts
+ * open rows hottest first, then closed rows newest first. The ledger figures (paid, pending, failed) and `allTotal`
+ * ignore the heat filter, as the cards do.
+ */
+export async function loadPayoutsWithHeat(
+  params: Record<string, string>,
+  page: { offset: number; limit: number; sort: PayoutListSort; dir: "asc" | "desc" },
+  now: Date = new Date(),
+) {
+  const today = istDayKey(now);
+  const band = parseHeatBand(params.heat);
+  const byHeat = page.sort === "heat";
+  // Open rows come from SQL soonest date first, so equal heat keeps the earlier pay date on top.
+  const sqlSort: PayoutSort = page.sort === "heat" ? "scheduled" : page.sort;
+  const [all, open] = await Promise.all([
+    loadPayouts(params, { offset: 0, limit: 0, sort: sqlSort, dir: page.dir }),
+    // Pending payouts are few at any time; every one is read (no cap) so heat sorts, filters and counts the whole open set.
+    loadPayouts(params, { offset: 0, limit: null, sort: sqlSort, dir: byHeat ? "asc" : page.dir }, "open"),
+  ]);
+  if (open.rows.length !== open.total) throw new Error(`Payout heat: read ${open.rows.length} of ${open.total} open payouts`);
+  const bank = await loadBankProblems(open.rows.map((r) => r.internId));
+  const openRows: HeatedPayoutRow[] = open.rows.map((r) => ({ ...r, heat: payoutHeat(ledgerHeatInput(r, bank.get(r.internId) ?? null), today) }));
+  const bands: Record<HeatBand, number> = { ...bandCounts(openRows.map((r) => r.heat)), closed: all.total - open.total };
+  const closedSort = { sort: (byHeat ? "created" : sqlSort) as PayoutSort, dir: byHeat ? ("desc" as const) : page.dir };
+
+  let rows: HeatedPayoutRow[];
+  let total: number;
+  if (band && band !== "closed") {
+    const list = openRows.filter((r) => heatBand(r.heat) === band);
+    rows = (byHeat ? sortByHeat(list, page.dir) : list).slice(page.offset, page.offset + page.limit);
+    total = list.length;
+  } else if (band === "closed") {
+    const closed = await loadPayouts(params, { offset: page.offset, limit: page.limit, ...closedSort }, "closed");
+    rows = closed.rows.map((r) => ({ ...r, heat: null }));
+    total = closed.total;
+  } else if (byHeat) {
+    const ordered = sortByHeat(openRows, page.dir);
+    const split = heatPageSplit(ordered.length, page.offset, page.limit);
+    const head = ordered.slice(split.openStart, split.openEnd);
+    const tail = split.closedLimit > 0 ? (await loadPayouts(params, { offset: split.closedOffset, limit: split.closedLimit, ...closedSort }, "closed")).rows : [];
+    rows = [...head, ...tail.map((r) => ({ ...r, heat: null }))];
+    total = all.total;
+  } else {
+    const heatOf = new Map(openRows.map((r) => [r.id, r.heat]));
+    const pageRows = await loadPayouts(params, { offset: page.offset, limit: page.limit, sort: sqlSort, dir: page.dir });
+    rows = pageRows.rows.map((r) => ({ ...r, heat: heatOf.get(r.id) ?? null }));
+    total = all.total;
+  }
+  return { ...all, rows, total, allTotal: all.total, bands };
+}
+
+export type HeatedDueRow = PlacementDueRow & { heat: Heat | null };
+
+/** Heat on each placement (open while a stipend month is owed). Bank details are read only for open placements. */
+export async function heatDues(rows: PlacementDueRow[], now: Date = new Date()): Promise<HeatedDueRow[]> {
+  const today = istDayKey(now);
+  const bank = await loadBankProblems(rows.filter(isOpenDue).map((d) => d.internId));
+  return rows.map((d) => ({ ...d, heat: payoutHeat(duesHeatInput(d, bank.get(d.internId) ?? null), today) }));
+}
+
+export { DUE_SORTS, dueHeatView, type DueSort } from "@/lib/admin/payout-heat";

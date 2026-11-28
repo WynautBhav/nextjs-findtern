@@ -15,7 +15,7 @@ import {
   COLLEGE_FILTERS,
   EMPLOYER_COLUMNS,
   EMPLOYER_FILTERS,
-  KPIS,
+  kpisFor,
   STUDENT_COLUMNS,
   STUDENT_FILTERS,
   TAB_TARGET,
@@ -38,7 +38,6 @@ import { istStamp } from "@/lib/college/master-row";
 import { cn } from "@/lib/utils";
 
 import { FollowUpMarks } from "./follow-up-marks";
-import { HeatMark } from "./heat-mark";
 import { RecordDrawer, type DrawerRecord } from "./record-drawer";
 
 /**
@@ -104,7 +103,7 @@ export function MasterDataView({
     const col = def.cols.find((c) => c.key === sort.key) ?? def.cols[0];
     return sortRows(list, col, sort.dir, def.cols[0]);
   }, [rows, def, filters, q, sort]);
-  const kpis = useMemo(() => KPIS.map((k) => ({ ...k, n: applyFilters(rows, def.filters, k.filters).length })), [rows, def]);
+  const kpis = useMemo(() => kpisFor(tab).map((k) => ({ ...k, n: applyFilters(rows, def.filters, k.filters).length })), [rows, def, tab]);
 
   const applyView = (id: string) => {
     const v = views.find((x) => x.id === id) ?? views[0];
@@ -120,7 +119,7 @@ export function MasterDataView({
     const keys = def.filters.map((d) => d.key);
     return keys.every((k) => (f[k] ?? "") === (filters[k] ?? ""));
   };
-  const toggleSort = (k: string) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: colOf(k)?.kind === "number" || k === "heat" ? "desc" : "asc" }));
+  const toggleSort = (k: string) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: colOf(k)?.kind === "number" || colOf(k)?.kind === "date" ? "desc" : "asc" }));
   const toggleCol = (k: string) => setColumns((cs) => (cs.includes(k) ? (cs.length > 1 ? cs.filter((c) => c !== k) : cs) : def.cols.map((c) => c.key).filter((c) => cs.includes(c) || c === k)));
   const groups = [...new Set(def.cols.map((c) => c.group))];
 
@@ -170,7 +169,6 @@ export function MasterDataView({
         </div>
       );
     }
-    if (c.key === "heat") return <HeatMark heat={r.heat} id={r.id} />;
     if (c.key === "followUp") return <FollowUpMarks f={r.followUp} canWrite={canWrite} busy={saving === r.id} onToggle={(n, d) => void setCall(r, n, d)} name={titleOf(tab, r).title} />;
     if (c.key === "lastSeenAt" && tab === "students") {
       const s = r as StudentRow;
@@ -208,7 +206,6 @@ export function MasterDataView({
               )}
             >
               <span className={cn("flex items-center gap-2 text-sm font-medium", on ? "" : "text-text-subtle")}>
-                {k.tone && !on ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-accent-500" /> : null}
                 {k.label}
               </span>
               <span className="nums mt-2 block text-[1.75rem] font-semibold leading-none tracking-[-0.03em] sm:text-[2.25rem]">{fmt(k.n)}</span>

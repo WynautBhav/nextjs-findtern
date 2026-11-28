@@ -117,6 +117,8 @@ export function pipelineView<R extends { bucket: PipelineBucket; pay?: AcceptedP
 
 /** One table row as the screen prints it; the CSV writes exactly these columns. */
 export type PipelineCsvRow = {
+  /** "Hot 82: why", or "Closed" (proposal-heat.ts). */
+  heat?: string;
   candidate: string;
   employer: string;
   project: string;
@@ -126,10 +128,10 @@ export type PipelineCsvRow = {
   pay: string;
 };
 
-export const PIPELINE_CSV_HEAD = ["Candidate", "Employer", "Project or role", "Type", "Outcome", "Created", "Pay"] as const;
+export const PIPELINE_CSV_HEAD = ["Heat", "Candidate", "Employer", "Project or role", "Type", "Outcome", "Created", "Pay"] as const;
 
 export function pipelineCsv(rows: PipelineCsvRow[]): string[][] {
-  return [[...PIPELINE_CSV_HEAD], ...rows.map((r) => [r.candidate, r.employer, r.project, r.type, r.outcome, r.created, r.pay].map(csvCell))];
+  return [[...PIPELINE_CSV_HEAD], ...rows.map((r) => [r.heat ?? "", r.candidate, r.employer, r.project, r.type, r.outcome, r.created, r.pay].map(csvCell))];
 }
 
 /**

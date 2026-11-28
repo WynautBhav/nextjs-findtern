@@ -1,113 +1,14 @@
 /**
- * Admin Master data (/admin/master-data): one row per student, employer and college, with the follow-up log, nudge
- * counts and a heat score. Pure (relative imports only), so the page, the table, the CSV and the tests share one
- * definition: every KPI is `countWhere(rows, filters)`, the same predicate the table filters with.
- *
- * HEAT (score 0-100, highest first by default) = IMPORTANCE + AGING + FOLLOW-UP, clamped to 0-100.
- *
- *  Importance is the first rung that matches (what is at stake, money or a placement):
- *    Student  70 accepted an offer, not paid yet · 60 offer waiting for their reply · 50 interview booked
- *             45 meeting request not answered · 35 hired · 35 AI interview under way (applied/scheduled/sent)
- *             32 interviewed, no offer yet · 30 complete profile, not interviewed · 10 signed up only
- *    Employer  5 frozen or switched off (nothing to chase) · 70 accepted offers not paid · 55 offers waiting for a reply
- *             45 interview booked · 40 open project, no offers sent · 30 has hired · 20 set up, no open project
- *             10 signed up only
- *    College  60 half or more of the bought seats unused · 50 half or more of 5+ students not interviewed
- *             45 drive running now · 40 partner with no seats bought · 25 students placed · 20 students joined
- *             10 no students yet
- *  Aging: days since the last movement (last seen, last offer or meeting, signup; a college's last TPO activity), capped
- *    at 30, scaled by the stake: round(min(30, days) * importance / 70). Nothing known = 30 days. A signup-only student
- *    idle a month gains 4; an unpaid accepted offer idle 10 days gains 10.
- *  Calls (Call 1 / Call 2, the manual follow-up ticks): a call is contact, so aging counts from the later of the last
- *    movement and the latest done call; and each done call takes 5 off (Call 1 −5, Call 2 −5 more). The automatic
- *    Nudge mark does not change heat (an unanswered nudge is not contact).
- *  Level: hot >= 70, warm >= 40, calm below. The table shows it as a 3-step mark with its word, never colour alone.
+ * Admin Master data (/admin/master-data): one row per student, employer and college, with the follow-up marks (Nudge
+ * automatic, Call 1 / Call 2 manual) and nudge counts. Pure (relative imports only), so the page, the table, the CSV and
+ * the tests share one definition: every card is `countWhere(rows, filters)`, the same predicate the table filters with.
+ * Default order: newest first by signup / created date. (Heat lives on the pipelines, lib/admin/heat.ts.)
  */
 
 import { csvCell, istStamp } from "../college/master-row.ts";
 import { aiStatusLabel } from "./intern-columns.ts";
+import { MEETING_STAGES, type MeetingStage } from "./meeting-stage.ts";
 import { followUpText, latestCall, type FollowUp, type FollowUpTarget } from "./follow-ups.ts";
-
-const DAY = 86_400_000;
-
-// ── Heat ─────────────────────────────────────────────────────────────────
-
-export type HeatLevel = "hot" | "warm" | "calm";
-export type Heat = { score: number; level: HeatLevel; why: string };
-export const HOT_AT = 70;
-export const WARM_AT = 40;
-export const HEAT_LABEL: Record<HeatLevel, string> = { hot: "Hot", warm: "Warm", calm: "Calm" };
-
-export const levelOf = (score: number): HeatLevel => (score >= HOT_AT ? "hot" : score >= WARM_AT ? "warm" : "calm");
-
-function finish(importance: number, reason: string, lastMoveAt: string | null, fu: FollowUp, now: number): Heat {
-  const call = latestCall(fu);
-  const from = [lastMoveAt, call?.at ?? null].filter((x): x is string => !!x).sort().pop() ?? null;
-  const t = from ? Date.parse(from) : NaN;
-  const days = Number.isNaN(t) ? 30 : Math.max(0, Math.floor((now - t) / DAY));
-  let score = importance + Math.round((Math.min(30, days) * importance) / 70);
-  const bits = [reason];
-  if (importance > 5 && days >= 2) bits.push(Number.isNaN(t) ? "no activity seen" : `quiet ${days} days`);
-  const calls = (fu.call1 ? 1 : 0) + (fu.call2 ? 1 : 0);
-  if (calls) { score -= 5 * calls; bits.push(calls === 2 ? "called twice" : "called once"); }
-  score = Math.max(0, Math.min(100, score));
-  return { score, level: levelOf(score), why: bits.join(" · ") };
-}
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-export type StudentHeatInput = {
-  unpaid: number; offersPending: number; meetingsUpcoming: number; meetingsWaiting: number;
-  hired: boolean; aiStatus: string; profileComplete: boolean; lastMoveAt: string | null; followUp: FollowUp;
-};
-export function studentHeat(s: StudentHeatInput, now: number): Heat {
-  const [imp, why]: [number, string] =
-    s.unpaid > 0 ? [70, "Accepted an offer, not paid yet"]
-    : s.offersPending > 0 ? [60, "Offer waiting for their reply"]
-    : s.meetingsUpcoming > 0 ? [50, "Interview booked"]
-    : s.meetingsWaiting > 0 ? [45, "Meeting request not answered"]
-    : s.hired ? [35, "Hired"]
-    : ["applied", "scheduled", "sent"].includes(s.aiStatus) ? [35, "AI interview under way"]
-    : s.aiStatus === "completed" ? [32, "Interviewed, no offer yet"]
-    : s.profileComplete ? [30, "Complete profile, not interviewed"]
-    : [10, "Signed up only"];
-  return finish(imp, why, s.lastMoveAt, s.followUp, now);
-}
-
-export type EmployerHeatInput = {
-  active: boolean; frozen: boolean; unpaid: number; offersPending: number; meetingsUpcoming: number;
-  openProjects: number; offersSent: number; hires: number; onboarded: boolean; lastMoveAt: string | null; followUp: FollowUp;
-};
-export function employerHeat(e: EmployerHeatInput, now: number): Heat {
-  const [imp, why]: [number, string] =
-    e.frozen ? [5, "Account frozen"]
-    : !e.active ? [5, "Account switched off"]
-    : e.unpaid > 0 ? [70, `${plural(e.unpaid, "accepted offer")} waiting on payment`]
-    : e.offersPending > 0 ? [55, `${plural(e.offersPending, "offer")} waiting for a reply`]
-    : e.meetingsUpcoming > 0 ? [45, "Interview booked"]
-    : e.openProjects > 0 && e.offersSent === 0 ? [40, "Open project, no offers sent"]
-    : e.hires > 0 ? [30, "Has hired"]
-    : e.onboarded ? [20, "Set up, no open project"]
-    : [10, "Signed up only"];
-  return finish(imp, why, e.lastMoveAt, e.followUp, now);
-}
-
-export type CollegeHeatInput = {
-  seatsBought: number; seatsUsed: number; students: number; notInterviewed: number; liveDrive: boolean; partner: boolean;
-  placed: number; lastMoveAt: string | null; followUp: FollowUp;
-};
-export function collegeHeat(c: CollegeHeatInput, now: number): Heat {
-  const unused = Math.max(0, c.seatsBought - c.seatsUsed);
-  const [imp, why]: [number, string] =
-    c.seatsBought > 0 && unused * 2 >= c.seatsBought ? [60, `${unused} of ${c.seatsBought} seats unused`]
-    : c.students >= 5 && c.notInterviewed * 2 >= c.students ? [50, `${c.notInterviewed} of ${c.students} students not interviewed`]
-    : c.liveDrive ? [45, "Drive running now"]
-    : c.partner && c.seatsBought === 0 ? [40, "Partner, no seats bought"]
-    : c.placed > 0 ? [25, `${plural(c.placed, "student")} placed`]
-    : c.students > 0 ? [20, "Students joined"]
-    : [10, "No students yet"];
-  return finish(imp, why, c.lastMoveAt, c.followUp, now);
-}
 
 // ── Nudges ───────────────────────────────────────────────────────────────
 
@@ -146,9 +47,9 @@ export function nudgeBreakdown(n: NudgeTally): string {
  */
 export type OfferTally = { sent: number; pending: number; accepted: number; unpaid: number; processing: number; hired: number; rejected: number; withdrawn: number; expired: number };
 /** Meetings by the Meeting pipeline's stages (meeting-stage.ts meetingStage): sent = waiting for a reply, accepted = upcoming. */
-export type MeetTally = { total: number; sent: number; accepted: number; completed: number; declined: number; expired: number; withdrawn: number };
+export type MeetTally = { total: number } & Record<MeetingStage, number>;
 export const NO_OFFERS: OfferTally = { sent: 0, pending: 0, accepted: 0, unpaid: 0, processing: 0, hired: 0, rejected: 0, withdrawn: 0, expired: 0 };
-export const NO_MEETS: MeetTally = { total: 0, sent: 0, accepted: 0, completed: 0, declined: 0, expired: 0, withdrawn: 0 };
+export const NO_MEETS: MeetTally = { total: 0, sent: 0, accepted: 0, completed: 0, expired: 0, withdrawn: 0 };
 
 export type OfferBucketIn = { bucket: "pending" | "accepted" | "hired" | "rejected" | "withdrawn" | "expired"; pay: "unpaid" | "processing" | null };
 export function offerTally(offers: OfferBucketIn[]): OfferTally {
@@ -164,7 +65,7 @@ export function meetTally(stages: string[]): MeetTally {
   const t = { ...NO_MEETS };
   for (const s of stages) {
     t.total += 1;
-    if (s === "sent" || s === "accepted" || s === "completed" || s === "declined" || s === "expired" || s === "withdrawn") t[s] += 1;
+    if ((MEETING_STAGES as readonly string[]).includes(s)) t[s as MeetingStage] += 1;
   }
   return t;
 }
@@ -185,7 +86,7 @@ export type StudentRow = {
   aiStatus: string; score: number | null; track: "tech" | "non_tech" | null; openToWork: boolean;
   offers: OfferTally; meetings: MeetTally; hired: HiredKinds;
   lastSeenAt: string | null; activityHidden: boolean; online: boolean; createdAt: string | null;
-  stage: Stage; nudges: NudgeTally; followUp: FollowUp; heat: Heat;
+  stage: Stage; nudges: NudgeTally; followUp: FollowUp;
 };
 
 export type EmployerRow = {
@@ -194,7 +95,7 @@ export type EmployerRow = {
   pro: string; viaDrive: boolean; inDriveNow: boolean;
   projectsTotal: number; projectsOpen: number; offers: OfferTally; meetings: MeetTally;
   /** Presence as the dashboard reads it (user_presence, hidden when show_activity is off). */
-  lastActiveAt: string | null; activityHidden: boolean; createdAt: string | null; nudges: NudgeTally; followUp: FollowUp; heat: Heat;
+  lastActiveAt: string | null; activityHidden: boolean; createdAt: string | null; nudges: NudgeTally; followUp: FollowUp;
 };
 
 export type CollegeRow = {
@@ -202,7 +103,7 @@ export type CollegeRow = {
   tpoName: string | null; tpoEmail: string | null; tpoCount: number;
   students: number; seatsBought: number; seatsUsed: number; drives: number; liveDrive: boolean;
   placed: number; offers: number; notInterviewed: number; lastTpoAt: string | null;
-  nudgesSent: number; lastNudgeAt: string | null; followUp: FollowUp; heat: Heat;
+  nudgesSent: number; lastNudgeAt: string | null; createdAt: string | null; followUp: FollowUp;
 };
 
 export type AnyRow = StudentRow | EmployerRow | CollegeRow;
@@ -240,13 +141,11 @@ export function followUpMatches(f: FollowUp, v: string): boolean {
     default: return true;
   }
 }
-const HEAT_FILTER: FilterDef<{ heat: Heat }> = { key: "heat", label: "Heat", options: opts([["hot", "Hot"], ["warm", "Warm"], ["calm", "Calm"]]), test: (r, v) => r.heat.level === v };
 const FU_FILTER: FilterDef<{ followUp: FollowUp }> = { key: "followUp", label: "Follow-up", options: () => FU_OPTIONS, test: (r, v) => followUpMatches(r.followUp, v) };
 
 export const anyHired = (h: HiredKinds) => h.internship || h.fullTime || h.ppo;
 
 export const STUDENT_FILTERS: FilterDef<StudentRow>[] = [
-  HEAT_FILTER as FilterDef<StudentRow>,
   FU_FILTER as FilterDef<StudentRow>,
   { key: "stage", label: "Stage", options: opts(Object.entries(STAGE_LABEL)), test: (r, v) => r.stage === v },
   { key: "accountType", label: "Account type", options: opts([["college", "College"], ["individual", "Individual"], ["unset", "Not chosen"]]), test: (r, v) => (v === "unset" ? r.accountType === null : r.accountType === v) },
@@ -265,7 +164,6 @@ export const PRO_LABEL: Record<string, string> = { active: "Active", expiring: "
 export const FTE_LABEL: Record<string, string> = { none: "Not applied", applied: "Applied", approved: "Approved" };
 
 export const EMPLOYER_FILTERS: FilterDef<EmployerRow>[] = [
-  HEAT_FILTER as FilterDef<EmployerRow>,
   FU_FILTER as FilterDef<EmployerRow>,
   { key: "standing", label: "Standing", options: opts([["active", "Active"], ["frozen", "Frozen"], ["off", "Switched off"], ["strikes", "Has strikes"]]), test: (r, v) => (v === "active" ? r.active && !r.frozen : v === "frozen" ? r.frozen : v === "off" ? !r.active : r.strikes > 0) },
   { key: "pro", label: "Findtern Pro", options: opts(Object.entries(PRO_LABEL).map(([k, l]) => [k, `Pro: ${l.toLowerCase()}`])), test: (r, v) => r.pro === v },
@@ -277,7 +175,6 @@ export const EMPLOYER_FILTERS: FilterDef<EmployerRow>[] = [
 ];
 
 export const COLLEGE_FILTERS: FilterDef<CollegeRow>[] = [
-  HEAT_FILTER as FilterDef<CollegeRow>,
   FU_FILTER as FilterDef<CollegeRow>,
   { key: "partner", label: "Partner", options: opts([["yes", "Partner"], ["no", "Not a partner"]]), test: (r, v) => yesNo(r.partner, v) },
   { key: "seats", label: "Seats", options: opts([["bought", "Seats bought"], ["unused", "Half or more unused"], ["none", "No seats bought"]]), test: (r, v) => (v === "bought" ? r.seatsBought > 0 : v === "none" ? r.seatsBought === 0 : r.seatsBought > 0 && (r.seatsBought - r.seatsUsed) * 2 >= r.seatsBought) },
@@ -306,13 +203,17 @@ export function applyFilters<R>(rows: R[], defs: FilterDef<R>[], f: Filters, q =
 export const countWhere = <R,>(rows: R[], defs: FilterDef<R>[], f: Filters) => applyFilters(rows, defs, f).length;
 
 /** The KPI cards: each one a filter set, counted with applyFilters. */
-export type Kpi = { key: string; label: string; hint: string; filters: Filters; tone?: "warning" };
+export type Kpi = { key: string; label: string; hint: string; filters: Filters };
+/** Students and employers: admin nudges count as follow-up. */
 export const KPIS: Kpi[] = [
   { key: "all", label: "Total", hint: "Every record on this tab", filters: {} },
-  { key: "hot", label: "Hot now", hint: "Most at stake, quiet longest", filters: { heat: "hot" }, tone: "warning" },
-  { key: "hot-open", label: "Hot, not followed up", hint: "No admin nudge and no call", filters: { heat: "hot", followUp: "nothing" }, tone: "warning" },
-  { key: "hot-uncalled", label: "Hot, not called", hint: "Hot with no Call 1 yet", filters: { heat: "hot", followUp: "not-called" } },
+  { key: "open", label: "Not nudged or called", hint: "No admin nudge and no call yet", filters: { followUp: "nothing" } },
+  { key: "call1", label: "Call 1 done", hint: "First call marked", filters: { followUp: "call1" } },
+  { key: "call2", label: "Call 2 done", hint: "Second call marked", filters: { followUp: "call2" } },
 ];
+/** Colleges cannot be nudged by an admin, so their first card is "Not called". */
+export const COLLEGE_KPIS: Kpi[] = [KPIS[0], { key: "open", label: "Not called", hint: "No Call 1 yet", filters: { followUp: "not-called" } }, KPIS[2], KPIS[3]];
+export const kpisFor = (tab: TabKey): Kpi[] => (tab === "colleges" ? COLLEGE_KPIS : KPIS);
 
 // ── Columns ──────────────────────────────────────────────────────────────
 
@@ -338,7 +239,7 @@ export function offerText(o: OfferTally): string {
 }
 export function meetText(m: MeetTally): string {
   if (!m.total) return "";
-  return [`${m.total} total`, m.sent && `${m.sent} waiting`, m.accepted && `${m.accepted} upcoming`, m.completed && `${m.completed} completed`, m.declined && `${m.declined} declined`, m.expired && `${m.expired} expired`, m.withdrawn && `${m.withdrawn} withdrawn`].filter(Boolean).join(" · ");
+  return [`${m.total} total`, m.sent && `${m.sent} waiting`, m.accepted && `${m.accepted} upcoming`, m.completed && `${m.completed} completed`, m.expired && `${m.expired} expired`, m.withdrawn && `${m.withdrawn} withdrawn`].filter(Boolean).join(" · ");
 }
 export function hiredText(h: HiredKinds): string {
   return [h.internship && "Internship", h.fullTime && "Full-time", h.ppo && "PPO"].filter(Boolean).join(" · ");
@@ -346,14 +247,12 @@ export function hiredText(h: HiredKinds): string {
 const ACCOUNT_LABEL = { college: "College", individual: "Individual" } as const;
 const TRACK_LABEL = { tech: "Tech", non_tech: "Non-tech" } as const;
 
-const heatCol = <R extends { heat: Heat }>(): ColumnDef<R> => ({ key: "heat", label: "Heat", group: "Follow-up", kind: "special", text: (r) => `${HEAT_LABEL[r.heat.level]} ${r.heat.score}: ${r.heat.why}`, sort: (r) => r.heat.score });
 const fuStatusCol = <R extends { followUp: FollowUp }>(): ColumnDef<R> => ({ key: "followUp", label: "Follow-up", group: "Follow-up", kind: "special", text: (r) => followUpText(r.followUp), sort: (r) => (r.followUp.nudge ? 1 : 0) + (r.followUp.call1 ? 2 : 0) + (r.followUp.call2 ? 4 : 0) });
 const fuNoteCol = <R extends { followUp: FollowUp }>(): ColumnDef<R> => txt<R>("followUpNote", "Call note", "Follow-up", (r) => latestCall(r.followUp)?.note ?? null);
 const fuAtCol = <R extends { followUp: FollowUp }>(): ColumnDef<R> => date<R>("followUpAt", "Last call", "Follow-up", (r) => latestCall(r.followUp)?.at ?? null);
 
 export const STUDENT_COLUMNS: ColumnDef<StudentRow>[] = [
   { key: "name", label: "Name", group: "Student", kind: "special", text: (r) => r.name, sort: (r) => r.name.toLowerCase() },
-  heatCol(),
   txt("email", "Email", "Student", (r) => r.email),
   txt("phone", "Phone", "Student", (r) => r.phone),
   txt("college", "College", "Student", (r) => r.college),
@@ -377,7 +276,6 @@ export const STUDENT_COLUMNS: ColumnDef<StudentRow>[] = [
 
 export const EMPLOYER_COLUMNS: ColumnDef<EmployerRow>[] = [
   { key: "company", label: "Company", group: "Company", kind: "special", text: (r) => r.company, sort: (r) => r.company.toLowerCase() },
-  heatCol(),
   txt("contact", "Contact", "Company", (r) => r.contact),
   txt("email", "Email", "Company", (r) => r.email),
   txt("phone", "Phone", "Company", (r) => r.phone),
@@ -404,7 +302,6 @@ export const EMPLOYER_COLUMNS: ColumnDef<EmployerRow>[] = [
 
 export const COLLEGE_COLUMNS: ColumnDef<CollegeRow>[] = [
   { key: "name", label: "College", group: "College", kind: "special", text: (r) => r.name, sort: (r) => r.name.toLowerCase() },
-  heatCol(),
   txt("city", "City", "College", (r) => r.city),
   txt("partner", "Partner", "College", (r) => yes(r.partner)),
   { key: "tpo", label: "TPO contact", group: "College", kind: "text", text: (r) => (r.tpoName ? [r.tpoName, r.tpoEmail].filter(Boolean).join(", ") + (r.tpoCount > 1 ? ` (+${r.tpoCount - 1})` : "") : ""), sort: (r) => lc(r.tpoName) },
@@ -415,6 +312,7 @@ export const COLLEGE_COLUMNS: ColumnDef<CollegeRow>[] = [
   num("offers", "Offers", "Placement", (r) => r.offers),
   num("placed", "Students placed", "Placement", (r) => r.placed),
   date("lastTpoAt", "Last TPO activity", "Activity", (r) => r.lastTpoAt),
+  date("createdAt", "Added", "Activity", (r) => r.createdAt),
   num("nudgesSent", "Nudges by TPO", "Activity", (r) => r.nudgesSent),
   date("lastNudgeAt", "Last TPO nudge", "Activity", (r) => r.lastNudgeAt),
   fuStatusCol(), fuNoteCol(), fuAtCol(),
@@ -446,28 +344,28 @@ export type TabKey = "students" | "employers" | "colleges";
 export const TAB_TARGET: Record<TabKey, FollowUpTarget> = { students: "student", employers: "employer", colleges: "college" };
 
 export type View = { id: string; name: string; columns: string[]; filters: Filters; sort: { key: string; dir: "asc" | "desc" } };
-const HEAT_SORT = { key: "heat", dir: "desc" } as const;
+const NEWEST = { key: "createdAt", dir: "desc" } as const;
 
 export const VIEWS: Record<TabKey, View[]> = {
   students: [
-    { id: "work", name: "Work list", columns: ["name", "heat", "college", "stage", "offers", "lastSeenAt", "nudges", "lastNudgedAt", "followUp", "followUpNote"], filters: {}, sort: HEAT_SORT },
-    { id: "money", name: "Waiting on payment", columns: ["name", "heat", "phone", "college", "offers", "lastSeenAt", "followUp", "followUpNote"], filters: { offers: "unpaid" }, sort: HEAT_SORT },
-    { id: "stuck", name: "Ready, not interviewed", columns: ["name", "heat", "phone", "college", "profile", "aiStatus", "lastSeenAt", "nudges", "followUp"], filters: { stage: "profile" }, sort: HEAT_SORT },
-    { id: "placement", name: "Offers and meetings", columns: ["name", "heat", "college", "aiStatus", "score", "offers", "meetings", "hired"], filters: {}, sort: HEAT_SORT },
+    { id: "work", name: "Work list", columns: ["name", "college", "stage", "offers", "lastSeenAt", "nudges", "lastNudgedAt", "followUp", "followUpNote"], filters: {}, sort: NEWEST },
+    { id: "money", name: "Waiting on payment", columns: ["name", "phone", "college", "offers", "lastSeenAt", "followUp", "followUpNote"], filters: { offers: "unpaid" }, sort: NEWEST },
+    { id: "stuck", name: "Ready, not interviewed", columns: ["name", "phone", "college", "profile", "aiStatus", "lastSeenAt", "nudges", "followUp"], filters: { stage: "profile" }, sort: NEWEST },
+    { id: "placement", name: "Offers and meetings", columns: ["name", "college", "aiStatus", "score", "offers", "meetings", "hired"], filters: {}, sort: NEWEST },
     { id: "contacts", name: "Contact sheet", columns: ["name", "email", "phone", "college", "city", "accountType"], filters: {}, sort: { key: "name", dir: "asc" } },
-    { id: "follow", name: "Follow-ups", columns: ["name", "heat", "phone", "followUp", "followUpNote", "followUpAt", "nudges", "lastNudgedAt"], filters: {}, sort: { key: "followUpAt", dir: "desc" } },
+    { id: "follow", name: "Follow-ups", columns: ["name", "phone", "followUp", "followUpNote", "followUpAt", "nudges", "lastNudgedAt"], filters: {}, sort: { key: "followUpAt", dir: "desc" } },
   ],
   employers: [
-    { id: "work", name: "Work list", columns: ["company", "heat", "contact", "projects", "offersWaiting", "unpaid", "lastActiveAt", "nudges", "lastNudgedAt", "followUp", "followUpNote"], filters: {}, sort: HEAT_SORT },
-    { id: "money", name: "Waiting on payment", columns: ["company", "heat", "contact", "phone", "unpaid", "offersAccepted", "lastActiveAt", "followUp"], filters: { offers: "unpaid" }, sort: HEAT_SORT },
-    { id: "idle", name: "Open project, no offers", columns: ["company", "heat", "contact", "phone", "projects", "offersSent", "lastActiveAt", "followUp"], filters: { projects: "open-no-offer" }, sort: HEAT_SORT },
+    { id: "work", name: "Work list", columns: ["company", "contact", "projects", "offersWaiting", "unpaid", "lastActiveAt", "nudges", "lastNudgedAt", "followUp", "followUpNote"], filters: {}, sort: NEWEST },
+    { id: "money", name: "Waiting on payment", columns: ["company", "contact", "phone", "unpaid", "offersAccepted", "lastActiveAt", "followUp"], filters: { offers: "unpaid" }, sort: NEWEST },
+    { id: "idle", name: "Open project, no offers", columns: ["company", "contact", "phone", "projects", "offersSent", "lastActiveAt", "followUp"], filters: { projects: "open-no-offer" }, sort: NEWEST },
     { id: "account", name: "Account standing", columns: ["company", "standing", "strikes", "pro", "fte", "emailVerified", "viaDrive"], filters: {}, sort: { key: "company", dir: "asc" } },
     { id: "contacts", name: "Contact sheet", columns: ["company", "contact", "email", "phone", "city"], filters: {}, sort: { key: "company", dir: "asc" } },
   ],
   colleges: [
-    { id: "work", name: "Work list", columns: ["name", "heat", "tpo", "students", "seats", "drives", "placed", "lastTpoAt", "nudgesSent", "lastNudgeAt", "followUp", "followUpNote"], filters: {}, sort: HEAT_SORT },
-    { id: "seats", name: "Seats unused", columns: ["name", "heat", "tpo", "seats", "students", "notInterviewed", "lastTpoAt", "followUp"], filters: { seats: "unused" }, sort: HEAT_SORT },
-    { id: "activity", name: "TPO activity", columns: ["name", "heat", "tpo", "lastTpoAt", "nudgesSent", "lastNudgeAt", "drives"], filters: {}, sort: { key: "lastTpoAt", dir: "desc" } },
+    { id: "work", name: "Work list", columns: ["name", "tpo", "students", "seats", "drives", "placed", "lastTpoAt", "nudgesSent", "lastNudgeAt", "followUp", "followUpNote"], filters: {}, sort: NEWEST },
+    { id: "seats", name: "Seats unused", columns: ["name", "tpo", "seats", "students", "notInterviewed", "lastTpoAt", "followUp"], filters: { seats: "unused" }, sort: NEWEST },
+    { id: "activity", name: "TPO activity", columns: ["name", "tpo", "lastTpoAt", "nudgesSent", "lastNudgeAt", "drives"], filters: {}, sort: { key: "lastTpoAt", dir: "desc" } },
   ],
 };
 

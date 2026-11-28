@@ -79,6 +79,20 @@ const DONE: Record<string, { state: InterviewState; label: string }> = {
   rescheduled: { state: "rescheduled", label: "Rescheduled" },
 };
 
+/**
+ * When an unpicked invite lapses, as interviewLifecycle reads it: at its respond-by (invite statuses only), or once
+ * its last offered slot has started, whichever is first. `at` is that instant (null when neither is set). Exported so
+ * a screen counting down to it (admin meeting heat) uses this rule, not a copy.
+ */
+export function inviteLapse(iv: LifecycleInput): { respondBy: number | null; lastSlot: number | null; at: number | null } {
+  const raw = (iv.status ?? "").trim().toLowerCase();
+  const respondBy = INVITE_STATUSES.includes(raw) ? toTime(iv.respondBy) : null;
+  const slots = offered(iv);
+  const lastSlot = slots.length ? Math.max(...slots) : null;
+  const both = [respondBy, lastSlot].filter((t): t is number => t !== null);
+  return { respondBy, lastSlot, at: both.length ? Math.min(...both) : null };
+}
+
 export function interviewLifecycle(iv: LifecycleInput, now: number = Date.now()): InterviewLifecycle {
   const raw = (iv.status ?? "").trim().toLowerCase();
   const picked = pickedStart(iv);
@@ -108,10 +122,10 @@ export function interviewLifecycle(iv: LifecycleInput, now: number = Date.now())
     if (raw === "scheduled") return now >= picked ? out("live", "Happening now", "scheduled") : out("upcoming", "Scheduled", "scheduled");
     return out("awaiting_pick", "Waiting on candidate");
   }
-  // No usable pick: an invite. Expired once its respond-by passed, or every offered slot has started.
-  const by = toTime(iv.respondBy);
-  if (by !== null && by <= now && INVITE_STATUSES.includes(raw)) return expired();
-  if (slots.length > 0 && slots.every((t) => t < now)) return expired();
+  // No usable pick: an invite. Expired once its respond-by passed, or every offered slot has started (inviteLapse).
+  const lapse = inviteLapse(iv);
+  if (lapse.respondBy !== null && lapse.respondBy <= now) return expired();
+  if (lapse.lastSlot !== null && lapse.lastSlot < now) return expired();
   return raw === "scheduled" ? out("upcoming", "Scheduled", "scheduled") : out("awaiting_pick", "Waiting on candidate");
 }
 

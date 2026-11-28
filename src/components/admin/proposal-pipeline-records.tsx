@@ -31,6 +31,10 @@ import { parseOffer } from "@/lib/offer";
 import { cn } from "@/lib/utils";
 import { toQueryString } from "@/lib/admin/params";
 import { X } from "lucide-react";
+import { HeatGuide } from "@/components/admin/heat/heat-guide";
+import { HeatMark } from "@/components/admin/heat/heat-mark";
+import { HEAT_LABEL } from "@/lib/admin/heat";
+import { HEAT_BANDS, PROPOSAL_HEAT_GUIDE, heatBand, parseHeatBand, proposalHeat, sortByHeat } from "@/lib/admin/proposal-heat";
 
 export { BUCKET_TONE, type PipelineItem };
 
@@ -58,25 +62,36 @@ export function ProposalRecords({
   rows: PipelineItem[];
 }) {
   const status = parsePipelineStatus(params.status);
-  const searched = rows.filter((r) => matchesSearch([nameOf(r), r.internEmail, r.companyName, r.projectName, parseOffer(r.offerDetails, r.currency).roleTitle], search));
+  // Heat (proposal-heat.ts) on every row; open rows only, closed rows are null. The Heat filter narrows like search does,
+  // before the type control and the cards, so every count above the table is still the rows it shows.
+  const now = new Date();
+  const heatFilter = parseHeatBand(params.heat);
+  const searched = rows
+    .filter((r) => matchesSearch([nameOf(r), r.internEmail, r.companyName, r.projectName, parseOffer(r.offerDetails, r.currency).roleTitle], search))
+    .map((r) => ({ ...r, heat: proposalHeat({ bucket: r.bucket, pay: r.pay, offerDetails: r.offerDetails, currency: r.currency, createdAt: r.createdAt }, now) }))
+    .filter((r) => !heatFilter || heatBand(r.heat) === heatFilter);
   // Type first (Internship | Full-time), then the outcome cards: each type segment counts what Total sent shows when picked.
   const type = parsePipelineType(params.type);
   const byType = pipelineByType(searched.map((r) => ({ ...r, type: proposalTypeOf(r.offerDetails, r.currency) })), type);
   // `pay=unpaid` comes only from the sidebar badge and the dashboard queue: a removable tag above the table, never on the Accepted card.
   const pay = status === "accepted" ? parsePayFilter(params.pay) : "";
   const view = pipelineView(byType.rows, status, pay);
-  const sort = parseSort(params, ["created", "candidate", "company"] as const, { key: "created", dir: "desc" });
-  const sorted = sortBy(
-    view.rows,
-    (r) => (sort.key === "candidate" ? nameOf(r).toLowerCase() : sort.key === "company" ? (r.companyName ?? "").toLowerCase() : r.createdAt ? r.createdAt.getTime() : null),
-    sort.dir,
-  );
+  // Default order: hottest first, closed rows after them (newest first).
+  const sort = parseSort(params, ["heat", "created", "candidate", "company"] as const, { key: "heat", dir: "desc" });
+  const sorted =
+    sort.key === "heat"
+      ? sortByHeat(view.rows, sort.dir)
+      : sortBy(
+          view.rows,
+          (r) => (sort.key === "candidate" ? nameOf(r).toLowerCase() : sort.key === "company" ? (r.companyName ?? "").toLowerCase() : r.createdAt ? r.createdAt.getTime() : null),
+          sort.dir,
+        );
   const pg = paginate(sorted, page, perPage);
-  const csv = pipelineCsv(sorted.map(csvRowOf));
-  const filtersOn = Boolean(search || status || type || params.company || params.intern || params.tz || params.from || params.to);
+  const csv = pipelineCsv(sorted.map((r) => ({ ...csvRowOf(r), heat: r.heat ? `${HEAT_LABEL[r.heat.level]} ${r.heat.score}: ${r.heat.why}` : "Closed" })));
+  const filtersOn = Boolean(search || status || type || heatFilter || params.company || params.intern || params.tz || params.from || params.to);
 
   // The cards are one GET form: each is a real button that sets `status` (the pressed one clears it), keeping every other filter.
-  const keep = ["from", "to", "company", "intern", "tz", "q", "sort", "dir", "per", "type"].filter((k) => params[k]);
+  const keep = ["from", "to", "company", "intern", "tz", "q", "sort", "dir", "per", "type", "heat"].filter((k) => params[k]);
   const cards: { key: PipelineBucket | ""; label: string; hint: string; n: number }[] = [
     { key: "", label: "Total sent", hint: PIPELINE_HINT.all, n: view.total },
     ...PIPELINE_BUCKETS.map((b) => ({ key: b, label: PIPELINE_LABEL[b], hint: PIPELINE_HINT[b], n: view.counts[b] })),
@@ -143,21 +158,25 @@ export function ProposalRecords({
         </div>
       </form>
 
-      {pay ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-text-subtle">Filtered by</span>
-          <Link
-            href={`${BASE}${toQueryString({ ...params, pay: "", page: "" })}`}
-            aria-label={`Remove filter: ${ACCEPTED_PAY_LABEL.unpaid.toLowerCase()}`}
-            data-testid="pipeline-pay-tag"
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel)] py-1 pl-3 pr-2 text-sm font-medium text-foreground shadow-[var(--admin-shadow)] transition-colors hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:min-h-11"
-          >
-            {ACCEPTED_PAY_LABEL.unpaid}
-            <span className="nums text-text-subtle">{formatNumber(view.acceptedPay.unpaid)}</span>
-            <X className="size-4 text-text-subtle" aria-hidden />
-          </Link>
-        </div>
-      ) : null}
+      {/* What heat means sits right above the table; the waiting-on-payment tag (from the badge links) follows it. */}
+      <div className="flex flex-col items-start gap-2">
+        <HeatGuide guide={PROPOSAL_HEAT_GUIDE} className="w-full" />
+        {pay ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-text-subtle">Filtered by</span>
+            <Link
+              href={`${BASE}${toQueryString({ ...params, pay: "", page: "" })}`}
+              aria-label={`Remove filter: ${ACCEPTED_PAY_LABEL.unpaid.toLowerCase()}`}
+              data-testid="pipeline-pay-tag"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel)] py-1 pl-3 pr-2 text-sm font-medium text-foreground shadow-[var(--admin-shadow)] transition-colors hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:min-h-11"
+            >
+              {ACCEPTED_PAY_LABEL.unpaid}
+              <span className="nums text-text-subtle">{formatNumber(view.acceptedPay.unpaid)}</span>
+              <X className="size-4 text-text-subtle" aria-hidden />
+            </Link>
+          </div>
+        ) : null}
+      </div>
 
       <DataTable
         basePath={BASE}
@@ -171,7 +190,10 @@ export function ProposalRecords({
         noun="proposals"
         caption={[type ? PIPELINE_TYPE_LABEL[type] : "", status ? PIPELINE_LABEL[status].toLowerCase() : "sent", pay ? "proposals waiting on payment" : "proposals"].filter(Boolean).join(" ").replace(/^./, (c) => c.toUpperCase())}
         searchPlaceholder="Search name, company, role…"
-        filters={pickers}
+        filters={[
+          ...pickers,
+          { key: "heat", label: "Heat", allLabel: "Any heat", options: HEAT_BANDS.map((b) => ({ value: b, label: b === "closed" ? "Closed" : HEAT_LABEL[b] })) },
+        ]}
         extraControls={<PipelineCsvButton table={csv} filename={`proposals${type ? `-${type}` : ""}${status ? `-${status}` : ""}${pay ? `-${pay}` : ""}.csv`} />}
         empty={
           filtersOn
@@ -180,15 +202,28 @@ export function ProposalRecords({
         }
         columns={[
           {
+            header: "Heat",
+            sort: "heat",
+            firstDir: "desc",
+            cell: (r) =>
+              r.heat ? (
+                <HeatMark heat={r.heat} id={r.id} compact />
+              ) : (
+                <span className="text-text-subtle" title="Closed: nothing to do">
+                  –<span className="sr-only">Closed: nothing to do</span>
+                </span>
+              ),
+          },
+          {
             header: "Candidate",
             sort: "candidate",
-            cell: (r) => <IdentityCell name={nameOf(r)} id={r.internId} href={`/admin/interns/${r.internId}`} sub={r.internEmail ?? "-"} size="sm" className="max-w-56" />,
+            cell: (r) => <IdentityCell name={nameOf(r)} id={r.internId} href={`/admin/interns/${r.internId}`} sub={r.internEmail ?? "-"} size="sm" className="max-w-40" />,
           },
           {
             header: "Employer",
             sort: "company",
             cell: (r) => (
-              <Link href={`/admin/companies/${r.employerId}`} className="block max-w-48 truncate font-medium text-foreground hover:underline" title={r.companyName ?? undefined}>
+              <Link href={`/admin/companies/${r.employerId}`} className="block max-w-32 truncate font-medium text-foreground hover:underline" title={r.companyName ?? undefined}>
                 {r.companyName ?? "Company"}
               </Link>
             ),
@@ -197,7 +232,7 @@ export function ProposalRecords({
             // Project (else the offer's role) with the proposal type under it: one column keeps the table inside 1440.
             header: "Project and type",
             cell: (r) => (
-              <div className="min-w-0 max-w-56">
+              <div className="min-w-0 max-w-44">
                 <span className="block truncate text-foreground" title={projectOf(r)}>
                   {projectOf(r)}
                 </span>
