@@ -3,16 +3,17 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
-import { FOLLOW_UP_NOTE_MAX, FOLLOW_UP_STATUSES, FOLLOW_UP_TARGETS, noteForNewRow, type FollowUpTarget } from "@/lib/admin/follow-ups";
+import { FOLLOW_UP_NOTE_MAX, FOLLOW_UP_TARGETS, callChangeError, callsOf, statusOf, type FollowUpTarget } from "@/lib/admin/follow-ups";
 import { canWrite, allows, requiredPermissions } from "@/lib/admin/permissions";
 import { realEmployers } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 
 /**
- * Master data follow-ups. POST appends one log row (the newest row is the record's current status and note); GET lists
- * one record's history for the drawer. Each target type also needs the rights of its own admin page: students follow
- * /admin/interns, employers /admin/companies, colleges /admin/colleges (read for GET, write for POST).
+ * Master data follow-up calls. POST ticks or undoes Call 1 / Call 2 (one log row each; the newest row per call wins);
+ * GET lists one record's call history for the drawer. The Nudge mark is never written here: it comes from admin nudges.
+ * Each target type also needs the rights of its own admin page: students follow /admin/interns, employers
+ * /admin/companies, colleges /admin/colleges (read for GET, write for POST).
  */
 
 const PAGE: Record<FollowUpTarget, string> = { student: "/admin/interns", employer: "/admin/companies", college: "/admin/colleges" };
@@ -21,13 +22,11 @@ const bodySchema = z
   .object({
     targetType: z.enum(FOLLOW_UP_TARGETS),
     targetId: z.string().trim().min(1).max(64),
-    status: z.enum(FOLLOW_UP_STATUSES),
+    call: z.union([z.literal(1), z.literal(2)]),
+    done: z.boolean(),
     note: z.string().trim().max(FOLLOW_UP_NOTE_MAX).optional(),
-    /** Status-only change: keep the newest note on record (read here, at write time). Never sent with a note. */
-    keepNote: z.literal(true).optional(),
   })
-  .strict()
-  .refine((b) => !(b.keepNote && b.note !== undefined));
+  .strict();
 
 /** The record must exist (and an employer must be a real one, as every admin list shows them). */
 async function targetExists(type: FollowUpTarget, id: string): Promise<boolean> {
@@ -49,24 +48,27 @@ export async function POST(req: Request) {
   if (!guard.ok) return guard.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: `Pick a status; the note can be up to ${FOLLOW_UP_NOTE_MAX} characters.` }, { status: 400 });
-  const { targetType, targetId, status } = parsed.data;
+  if (!parsed.success) return NextResponse.json({ error: `Pick Call 1 or Call 2; the note can be up to ${FOLLOW_UP_NOTE_MAX} characters.` }, { status: 400 });
+  const { targetType, targetId, call, done } = parsed.data;
+  const note = parsed.data.note ? parsed.data.note : null;
 
   if (!canWrite(guard.session.permissions, PAGE[targetType])) return NextResponse.json({ error: "Your role doesn't allow this" }, { status: 403 });
   if (!(await targetExists(targetType, targetId))) return NextResponse.json({ error: "That record no longer exists." }, { status: 404 });
 
-  const db = getDb();
   const f = schema.adminFollowUps;
-  const [row] = await db.transaction(async (tx) => {
-    const [latest] = parsed.data.keepNote
-      ? await tx.select({ note: f.note }).from(f).where(and(eq(f.targetType, targetType), eq(f.targetId, targetId))).orderBy(desc(f.createdAt)).limit(1)
-      : [];
-    const note = noteForNewRow(parsed.data, latest?.note ?? null);
-    const inserted = await tx.insert(schema.adminFollowUps).values({ targetType, targetId, status, note, adminId: guard.session.uid }).returning();
-    await recordAdminAudit(tx, { adminId: guard.session.uid, action: "follow_up.set", targetType, targetId, meta: { status, hasNote: note !== null, keptNote: Boolean(parsed.data.keepNote) } }, { strict: true });
-    return inserted;
+  const result = await getDb().transaction(async (tx) => {
+    // One writer per record at a time, so two tabs cannot both pass the order check (Call 2 before Call 1).
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`follow-up:${targetType}:${targetId}`}))`);
+    const log = await tx.select({ status: f.status, note: f.note, createdAt: f.createdAt }).from(f).where(and(eq(f.targetType, targetType), eq(f.targetId, targetId)));
+    const cur = callsOf(log);
+    const error = callChangeError({ call1: cur.call1 !== null, call2: cur.call2 !== null }, { call, done });
+    if (error) return { error };
+    const [row] = await tx.insert(f).values({ targetType, targetId, status: statusOf(call, done), note, adminId: guard.session.uid }).returning();
+    await recordAdminAudit(tx, { adminId: guard.session.uid, action: "follow_up.set", targetType, targetId, meta: { call, done, hasNote: note !== null } }, { strict: true });
+    return { row };
   });
-  return NextResponse.json({ ok: true, followUp: { status: row.status, note: row.note, at: row.createdAt.toISOString() } });
+  if ("error" in result) return NextResponse.json({ error: result.error }, { status: 400 });
+  return NextResponse.json({ ok: true, call, done, at: result.row.createdAt.toISOString() });
 }
 
 export async function GET(req: Request) {

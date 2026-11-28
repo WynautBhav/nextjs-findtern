@@ -18,14 +18,15 @@
  *  Aging: days since the last movement (last seen, last offer or meeting, signup; a college's last TPO activity), capped
  *    at 30, scaled by the stake: round(min(30, days) * importance / 70). Nothing known = 30 days. A signup-only student
  *    idle a month gains 4; an unpaid accepted offer idle 10 days gains 10.
- *  Follow-up: the latest status 'escalated' adds 20; 'responded' within the last 7 days takes 20 off; 'followed_up'
- *    within the last 3 days takes 10 off (someone is on it).
+ *  Calls (Call 1 / Call 2, the manual follow-up ticks): a call is contact, so aging counts from the later of the last
+ *    movement and the latest done call; and each done call takes 5 off (Call 1 −5, Call 2 −5 more). The automatic
+ *    Nudge mark does not change heat (an unanswered nudge is not contact).
  *  Level: hot >= 70, warm >= 40, calm below. The table shows it as a 3-step mark with its word, never colour alone.
  */
 
 import { csvCell, istStamp } from "../college/master-row.ts";
 import { aiStatusLabel } from "./intern-columns.ts";
-import { FOLLOW_UP_LABEL, FOLLOW_UP_STATUSES, type FollowUp, type FollowUpStatus, type FollowUpTarget } from "./follow-ups.ts";
+import { followUpText, latestCall, type FollowUp, type FollowUpTarget } from "./follow-ups.ts";
 
 const DAY = 86_400_000;
 
@@ -39,18 +40,16 @@ export const HEAT_LABEL: Record<HeatLevel, string> = { hot: "Hot", warm: "Warm",
 
 export const levelOf = (score: number): HeatLevel => (score >= HOT_AT ? "hot" : score >= WARM_AT ? "warm" : "calm");
 
-function finish(importance: number, reason: string, lastMoveAt: string | null, fu: FollowUp | null, now: number): Heat {
-  const t = lastMoveAt ? Date.parse(lastMoveAt) : NaN;
+function finish(importance: number, reason: string, lastMoveAt: string | null, fu: FollowUp, now: number): Heat {
+  const call = latestCall(fu);
+  const from = [lastMoveAt, call?.at ?? null].filter((x): x is string => !!x).sort().pop() ?? null;
+  const t = from ? Date.parse(from) : NaN;
   const days = Number.isNaN(t) ? 30 : Math.max(0, Math.floor((now - t) / DAY));
   let score = importance + Math.round((Math.min(30, days) * importance) / 70);
   const bits = [reason];
   if (importance > 5 && days >= 2) bits.push(Number.isNaN(t) ? "no activity seen" : `quiet ${days} days`);
-  if (fu) {
-    const age = now - Date.parse(fu.at);
-    if (fu.status === "escalated") { score += 20; bits.push("escalated"); }
-    else if (fu.status === "responded" && age < 7 * DAY) { score -= 20; bits.push("responded recently"); }
-    else if (fu.status === "followed_up" && age < 3 * DAY) { score -= 10; bits.push("followed up recently"); }
-  }
+  const calls = (fu.call1 ? 1 : 0) + (fu.call2 ? 1 : 0);
+  if (calls) { score -= 5 * calls; bits.push(calls === 2 ? "called twice" : "called once"); }
   score = Math.max(0, Math.min(100, score));
   return { score, level: levelOf(score), why: bits.join(" · ") };
 }
@@ -59,7 +58,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 
 export type StudentHeatInput = {
   unpaid: number; offersPending: number; meetingsUpcoming: number; meetingsWaiting: number;
-  hired: boolean; aiStatus: string; profileComplete: boolean; lastMoveAt: string | null; followUp: FollowUp | null;
+  hired: boolean; aiStatus: string; profileComplete: boolean; lastMoveAt: string | null; followUp: FollowUp;
 };
 export function studentHeat(s: StudentHeatInput, now: number): Heat {
   const [imp, why]: [number, string] =
@@ -77,7 +76,7 @@ export function studentHeat(s: StudentHeatInput, now: number): Heat {
 
 export type EmployerHeatInput = {
   active: boolean; frozen: boolean; unpaid: number; offersPending: number; meetingsUpcoming: number;
-  openProjects: number; offersSent: number; hires: number; onboarded: boolean; lastMoveAt: string | null; followUp: FollowUp | null;
+  openProjects: number; offersSent: number; hires: number; onboarded: boolean; lastMoveAt: string | null; followUp: FollowUp;
 };
 export function employerHeat(e: EmployerHeatInput, now: number): Heat {
   const [imp, why]: [number, string] =
@@ -95,7 +94,7 @@ export function employerHeat(e: EmployerHeatInput, now: number): Heat {
 
 export type CollegeHeatInput = {
   seatsBought: number; seatsUsed: number; students: number; notInterviewed: number; liveDrive: boolean; partner: boolean;
-  placed: number; lastMoveAt: string | null; followUp: FollowUp | null;
+  placed: number; lastMoveAt: string | null; followUp: FollowUp;
 };
 export function collegeHeat(c: CollegeHeatInput, now: number): Heat {
   const unused = Math.max(0, c.seatsBought - c.seatsUsed);
@@ -113,8 +112,9 @@ export function collegeHeat(c: CollegeHeatInput, now: number): Heat {
 // ── Nudges ───────────────────────────────────────────────────────────────
 
 /** TPO = college_nudges rows (a placement officer's chase); Findtern = notifications of type 'nudge' sent from the admin. */
-export type NudgeTally = { tpo: number; findtern: number; last: string | null };
-export const NO_NUDGES: NudgeTally = { tpo: 0, findtern: 0, last: null };
+/** `lastFindtern` is the last admin nudge: the one source of the automatic Nudge follow-up mark. */
+export type NudgeTally = { tpo: number; findtern: number; last: string | null; lastFindtern: string | null };
+export const NO_NUDGES: NudgeTally = { tpo: 0, findtern: 0, last: null, lastFindtern: null };
 export type NudgeSourceRow = { targetId: string; source: "tpo" | "findtern"; n: number; last: Date | string | null };
 
 /** One tally per target from the grouped SQL rows (master-data.ts loadNudgeRows). */
@@ -125,6 +125,7 @@ export function nudgeTallies(rows: NudgeSourceRow[]): Map<string, NudgeTally> {
     cur[r.source] += Number(r.n) || 0;
     const last = r.last ? new Date(r.last).toISOString() : null;
     if (last && (!cur.last || last > cur.last)) cur.last = last;
+    if (r.source === "findtern" && last && (!cur.lastFindtern || last > cur.lastFindtern)) cur.lastFindtern = last;
     out.set(r.targetId, cur);
   }
   return out;
@@ -184,7 +185,7 @@ export type StudentRow = {
   aiStatus: string; score: number | null; track: "tech" | "non_tech" | null; openToWork: boolean;
   offers: OfferTally; meetings: MeetTally; hired: HiredKinds;
   lastSeenAt: string | null; activityHidden: boolean; online: boolean; createdAt: string | null;
-  stage: Stage; nudges: NudgeTally; followUp: FollowUp | null; heat: Heat;
+  stage: Stage; nudges: NudgeTally; followUp: FollowUp; heat: Heat;
 };
 
 export type EmployerRow = {
@@ -193,7 +194,7 @@ export type EmployerRow = {
   pro: string; viaDrive: boolean; inDriveNow: boolean;
   projectsTotal: number; projectsOpen: number; offers: OfferTally; meetings: MeetTally;
   /** Presence as the dashboard reads it (user_presence, hidden when show_activity is off). */
-  lastActiveAt: string | null; activityHidden: boolean; createdAt: string | null; nudges: NudgeTally; followUp: FollowUp | null; heat: Heat;
+  lastActiveAt: string | null; activityHidden: boolean; createdAt: string | null; nudges: NudgeTally; followUp: FollowUp; heat: Heat;
 };
 
 export type CollegeRow = {
@@ -201,7 +202,7 @@ export type CollegeRow = {
   tpoName: string | null; tpoEmail: string | null; tpoCount: number;
   students: number; seatsBought: number; seatsUsed: number; drives: number; liveDrive: boolean;
   placed: number; offers: number; notInterviewed: number; lastTpoAt: string | null;
-  nudgesSent: number; lastNudgeAt: string | null; followUp: FollowUp | null; heat: Heat;
+  nudgesSent: number; lastNudgeAt: string | null; followUp: FollowUp; heat: Heat;
 };
 
 export type AnyRow = StudentRow | EmployerRow | CollegeRow;
@@ -219,10 +220,28 @@ const distinct = (vals: (string | null)[], none: string): Option[] => {
 };
 const eqOrNone = (val: string | null, v: string) => (v === "__none" ? !val : val === v);
 const yesNo = (b: boolean, v: string) => (v === "yes" ? b : !b);
-const FU_OPTIONS: Option[] = [{ value: "none", label: "No follow-up yet" }, ...FOLLOW_UP_STATUSES.map((s) => ({ value: s, label: FOLLOW_UP_LABEL[s] }))];
-const fuTest = (fu: FollowUp | null, v: string) => (v === "none" ? fu === null : fu?.status === v);
+const FU_OPTIONS: Option[] = [
+  { value: "nothing", label: "Nothing yet" },
+  { value: "not-nudged", label: "Not nudged" },
+  { value: "nudged", label: "Nudged" },
+  { value: "not-called", label: "Not called yet" },
+  { value: "call1", label: "Call 1 done" },
+  { value: "call2", label: "Call 2 done" },
+];
+/** The Follow-up filter. "Nothing yet" = no admin nudge and no call; "Not called yet" = no Call 1. */
+export function followUpMatches(f: FollowUp, v: string): boolean {
+  switch (v) {
+    case "nothing": return !f.nudge && !f.call1 && !f.call2;
+    case "not-nudged": return !f.nudge;
+    case "nudged": return f.nudge !== null;
+    case "not-called": return !f.call1;
+    case "call1": return f.call1 !== null;
+    case "call2": return f.call2 !== null;
+    default: return true;
+  }
+}
 const HEAT_FILTER: FilterDef<{ heat: Heat }> = { key: "heat", label: "Heat", options: opts([["hot", "Hot"], ["warm", "Warm"], ["calm", "Calm"]]), test: (r, v) => r.heat.level === v };
-const FU_FILTER: FilterDef<{ followUp: FollowUp | null }> = { key: "followUp", label: "Follow-up", options: () => FU_OPTIONS, test: (r, v) => fuTest(r.followUp, v) };
+const FU_FILTER: FilterDef<{ followUp: FollowUp }> = { key: "followUp", label: "Follow-up", options: () => FU_OPTIONS, test: (r, v) => followUpMatches(r.followUp, v) };
 
 export const anyHired = (h: HiredKinds) => h.internship || h.fullTime || h.ppo;
 
@@ -291,8 +310,8 @@ export type Kpi = { key: string; label: string; hint: string; filters: Filters; 
 export const KPIS: Kpi[] = [
   { key: "all", label: "Total", hint: "Every record on this tab", filters: {} },
   { key: "hot", label: "Hot now", hint: "Most at stake, quiet longest", filters: { heat: "hot" }, tone: "warning" },
-  { key: "hot-open", label: "Hot, not followed up", hint: "Hot with no follow-up yet", filters: { heat: "hot", followUp: "none" }, tone: "warning" },
-  { key: "escalated", label: "Escalated", hint: "Latest follow-up is escalated", filters: { followUp: "escalated" } },
+  { key: "hot-open", label: "Hot, not followed up", hint: "No admin nudge and no call", filters: { heat: "hot", followUp: "nothing" }, tone: "warning" },
+  { key: "hot-uncalled", label: "Hot, not called", hint: "Hot with no Call 1 yet", filters: { heat: "hot", followUp: "not-called" } },
 ];
 
 // ── Columns ──────────────────────────────────────────────────────────────
@@ -328,9 +347,9 @@ const ACCOUNT_LABEL = { college: "College", individual: "Individual" } as const;
 const TRACK_LABEL = { tech: "Tech", non_tech: "Non-tech" } as const;
 
 const heatCol = <R extends { heat: Heat }>(): ColumnDef<R> => ({ key: "heat", label: "Heat", group: "Follow-up", kind: "special", text: (r) => `${HEAT_LABEL[r.heat.level]} ${r.heat.score}: ${r.heat.why}`, sort: (r) => r.heat.score });
-const fuStatusCol = <R extends { followUp: FollowUp | null }>(): ColumnDef<R> => ({ key: "followUp", label: "Follow-up", group: "Follow-up", kind: "special", text: (r) => (r.followUp ? FOLLOW_UP_LABEL[r.followUp.status] : ""), sort: (r) => (r.followUp ? FOLLOW_UP_STATUSES.indexOf(r.followUp.status) : null) });
-const fuNoteCol = <R extends { followUp: FollowUp | null }>(): ColumnDef<R> => txt<R>("followUpNote", "Follow-up note", "Follow-up", (r) => r.followUp?.note ?? null);
-const fuAtCol = <R extends { followUp: FollowUp | null }>(): ColumnDef<R> => date<R>("followUpAt", "Followed up on", "Follow-up", (r) => r.followUp?.at ?? null);
+const fuStatusCol = <R extends { followUp: FollowUp }>(): ColumnDef<R> => ({ key: "followUp", label: "Follow-up", group: "Follow-up", kind: "special", text: (r) => followUpText(r.followUp), sort: (r) => (r.followUp.nudge ? 1 : 0) + (r.followUp.call1 ? 2 : 0) + (r.followUp.call2 ? 4 : 0) });
+const fuNoteCol = <R extends { followUp: FollowUp }>(): ColumnDef<R> => txt<R>("followUpNote", "Call note", "Follow-up", (r) => latestCall(r.followUp)?.note ?? null);
+const fuAtCol = <R extends { followUp: FollowUp }>(): ColumnDef<R> => date<R>("followUpAt", "Last call", "Follow-up", (r) => latestCall(r.followUp)?.at ?? null);
 
 export const STUDENT_COLUMNS: ColumnDef<StudentRow>[] = [
   { key: "name", label: "Name", group: "Student", kind: "special", text: (r) => r.name, sort: (r) => r.name.toLowerCase() },
@@ -452,4 +471,3 @@ export const VIEWS: Record<TabKey, View[]> = {
   ],
 };
 
-export type { FollowUpStatus };

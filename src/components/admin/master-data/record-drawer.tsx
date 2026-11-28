@@ -8,11 +8,12 @@ import { useEffect, useState } from "react";
 import { useConfirm } from "@/components/app/use-confirm";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { csrfFetch } from "@/lib/client-fetch";
-import { FOLLOW_UP_LABEL, FOLLOW_UP_NOTE_MAX, FOLLOW_UP_STATUSES, type FollowUpStatus } from "@/lib/admin/follow-ups";
+import { FOLLOW_UP_NOTE_MAX, historyText, type CallNo } from "@/lib/admin/follow-ups";
 import { HEAT_LABEL, TAB_TARGET, nudgeBreakdown, type AnyRow, type ColumnDef, type TabKey } from "@/lib/admin/master-data-pure";
 import { istStamp } from "@/lib/college/master-row";
 import { cn } from "@/lib/utils";
 
+import { FollowUpMarks } from "./follow-up-marks";
 
 type History = { status: string; note: string | null; at: string; by: string | null }[];
 
@@ -23,8 +24,8 @@ const HIDE = new Set(["name", "company", "heat", "followUp", "followUpNote", "fo
 export type DrawerRecord = { row: AnyRow; title: string; sub: string; href: string | null };
 
 /**
- * One record, every field: why it is hot, its nudges (TPO and Findtern), the follow-up box (status + note, saved as a
- * new log row) and the follow-up history. Side sheet with the dashboard drawer's deep green head.
+ * One record, every field: why it is hot, its follow-up marks (Nudge automatic; Call 1 and Call 2 ticked here with an
+ * optional note, each a new log row), its nudges (TPO and Findtern) and the call history. Side sheet with the dashboard drawer's deep green head.
  */
 export function RecordDrawer({ tab, record, columns, canWrite, canNudge, onClose }: { tab: TabKey; record: DrawerRecord | null; columns: ColumnDef<AnyRow>[]; canWrite: boolean; canNudge: boolean; onClose: () => void }) {
   return (
@@ -41,9 +42,8 @@ function Body({ tab, record, columns, canWrite, canNudge }: { tab: TabKey; recor
   const { ask, dialog } = useConfirm();
   const { row } = record;
   const target = TAB_TARGET[tab];
-  const current = row.followUp;
-  const [status, setStatus] = useState<FollowUpStatus>(current?.status ?? "pending");
-  const [note, setNote] = useState(current?.note ?? "");
+  const fu = row.followUp;
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null);
   const [history, setHistory] = useState<History | null>(null);
@@ -64,19 +64,20 @@ function Body({ tab, record, columns, canWrite, canNudge }: { tab: TabKey; recor
     return () => { live = false; };
   }, [target, row.id, reload]);
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
+  async function setCall(call: CallNo, done: boolean) {
+    if (!done && !(await ask({ title: `Undo Call ${call}?`, body: "The tick is removed. The history keeps both steps.", confirmLabel: `Undo Call ${call}`, destructive: false }))) return;
     setBusy(true);
     setMsg(null);
     try {
       const res = await csrfFetch("/api/admin/follow-ups", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ targetType: target, targetId: row.id, status, note: note.trim() || undefined }),
+        body: JSON.stringify({ targetType: target, targetId: row.id, call, done, note: note.trim() || undefined }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) return setMsg({ text: j.error ?? "Not saved. Try again.", bad: true });
-      setMsg({ text: `Saved as ${FOLLOW_UP_LABEL[status].toLowerCase()}.`, bad: false });
+      setMsg({ text: `Call ${call} ${done ? "marked done" : "undone"}.`, bad: false });
+      setNote("");
       setReload((n) => n + 1);
       router.refresh();
     } catch {
@@ -145,26 +146,26 @@ function Body({ tab, record, columns, canWrite, canNudge }: { tab: TabKey; recor
 
         <section aria-labelledby="fu-head">
           <h3 id="fu-head" className="text-base font-semibold text-foreground">Follow-up</h3>
+          <div className="mt-3"><FollowUpMarks f={fu} canWrite={false} busy={false} onToggle={() => undefined} name={record.title} /></div>
           {canWrite ? (
-            <form onSubmit={save} className="mt-3 space-y-3">
+            <form onSubmit={(e) => { e.preventDefault(); const n: CallNo | null = !fu.call1 ? 1 : !fu.call2 ? 2 : null; if (n) void setCall(n, true); }} className="mt-4 space-y-3">
               <label className="block text-sm text-text-subtle">
-                Status
-                <select value={status} onChange={(e) => setStatus(e.target.value as FollowUpStatus)} className={cn(FIELD, "mt-1 h-10")}>
-                  {FOLLOW_UP_STATUSES.map((s) => <option key={s} value={s}>{FOLLOW_UP_LABEL[s]}</option>)}
-                </select>
+                Call note (optional)
+                <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={FOLLOW_UP_NOTE_MAX} rows={3} aria-describedby="fu-count" placeholder="What was said, what happens next" className={cn(FIELD, "mt-1 py-2")} />
               </label>
-              <label className="block text-sm text-text-subtle">
-                Note
-                <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={FOLLOW_UP_NOTE_MAX} rows={4} aria-describedby="fu-count" placeholder="What was said, what happens next" className={cn(FIELD, "mt-1 py-2")} />
-              </label>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span id="fu-count" className="nums text-xs text-text-subtle">{note.length} of {FOLLOW_UP_NOTE_MAX}</span>
-                <button type="submit" disabled={busy} className={cn(BTN, "bg-primary text-white hover:bg-primary-hover")}>{busy ? "Saving…" : "Save follow-up"}</button>
+                <span className="flex flex-wrap gap-2">
+                  {fu.call1 ? (
+                    <button type="button" disabled={busy} onClick={() => void setCall(fu.call2 ? 2 : 1, false)} className={cn(BTN, "border border-ink-200 text-foreground hover:bg-[color:var(--admin-panel-2)]")}>Undo Call {fu.call2 ? 2 : 1}</button>
+                  ) : null}
+                  {!fu.call2 ? (
+                    <button type="submit" disabled={busy} className={cn(BTN, "bg-primary text-white hover:bg-primary-hover")}>{busy ? "Saving…" : `Mark Call ${fu.call1 ? 2 : 1} done`}</button>
+                  ) : null}
+                </span>
               </div>
             </form>
-          ) : (
-            <p className="mt-2 text-sm text-foreground">{current ? `${FOLLOW_UP_LABEL[current.status]}${current.note ? `: ${current.note}` : ""}` : "No follow-up yet."}</p>
-          )}
+          ) : null}
         </section>
 
         {nudges ? (
@@ -216,15 +217,12 @@ function Body({ tab, record, columns, canWrite, canNudge }: { tab: TabKey; recor
           ) : history === null ? (
             <p className="mt-2 text-sm text-text-subtle">Loading…</p>
           ) : history.length === 0 ? (
-            <p className="mt-2 text-sm text-text-subtle">No follow-ups yet.</p>
+            <p className="mt-2 text-sm text-text-subtle">No calls yet.</p>
           ) : (
             <ol className="mt-2 space-y-3">
               {history.map((h, i) => (
                 <li key={`${h.at}-${i}`} className="rounded-xl bg-[color:var(--admin-panel-2)] px-3 py-2.5 text-sm">
-                  <p className="flex flex-wrap items-baseline justify-between gap-x-3">
-                    <span className="font-medium text-foreground">{FOLLOW_UP_LABEL[h.status as FollowUpStatus] ?? h.status}</span>
-                    <span className="nums text-xs text-text-subtle">{istStamp(h.at)}{h.by ? ` · ${h.by}` : ""}</span>
-                  </p>
+                  <p className="nums font-medium text-foreground">{historyText(h)}</p>
                   {h.note ? <p className="mt-1 whitespace-pre-line break-words text-foreground">{h.note}</p> : null}
                 </li>
               ))}

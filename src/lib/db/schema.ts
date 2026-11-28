@@ -307,9 +307,10 @@ export const adminAuditLog = pgTable("admin_audit_log", {
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 
 /**
- * Master data follow-ups (0057). A log, never edited: the newest row for a target is its current status and note; the
- * older rows are its history. target_type: student | employer | college. status: pending | followed_up | responded |
- * no_response | escalated (lib/admin/follow-ups.ts). admin_id is the admin who wrote it, as on admin_audit_log.
+ * Master data follow-ups (0057, statuses 0058). A log, never edited: each Call 1 / Call 2 tick or undo inserts a row and
+ * the newest row per call wins; older rows are the history. target_type: student | employer | college. status: call_1 |
+ * call_2 | call_1_undone | call_2_undone (lib/admin/follow-ups.ts). The Nudge mark is derived from admin nudges, never
+ * stored here. admin_id is the admin who wrote it, as on admin_audit_log.
  */
 export const adminFollowUps = pgTable("admin_follow_ups", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

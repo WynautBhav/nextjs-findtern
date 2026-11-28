@@ -8,7 +8,8 @@ import { AdminAvatar } from "@/components/admin/avatar";
 import { buttonClass } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { csrfFetch } from "@/lib/client-fetch";
-import { FOLLOW_UP_LABEL, FOLLOW_UP_STATUSES, type FollowUpStatus } from "@/lib/admin/follow-ups";
+import { useConfirm } from "@/components/app/use-confirm";
+import type { CallNo } from "@/lib/admin/follow-ups";
 import {
   COLLEGE_COLUMNS,
   COLLEGE_FILTERS,
@@ -36,6 +37,7 @@ import { ago } from "@/lib/college/labels";
 import { istStamp } from "@/lib/college/master-row";
 import { cn } from "@/lib/utils";
 
+import { FollowUpMarks } from "./follow-up-marks";
 import { HeatMark } from "./heat-mark";
 import { RecordDrawer, type DrawerRecord } from "./record-drawer";
 
@@ -82,6 +84,7 @@ export function MasterDataView({
   hrefBase: string | null;
 }) {
   const router = useRouter();
+  const { ask, dialog } = useConfirm();
   const def = DEFS[tab];
   const views = VIEWS[tab];
   const colOf = (k: string) => def.cols.find((c) => c.key === k);
@@ -132,19 +135,20 @@ export function MasterDataView({
     setMsg({ text: `Downloaded ${fmt(visible.length)} ${visible.length === 1 ? def.one : def.many}, ${shownCols.length} columns.`, bad: false });
   }
 
-  async function setStatus(r: AnyRow, status: FollowUpStatus) {
+  async function setCall(r: AnyRow, call: CallNo, done: boolean) {
+    const who = titleOf(tab, r).title;
+    if (!done && !(await ask({ title: `Undo Call ${call} for ${who}?`, body: "The tick is removed. The history keeps both steps.", confirmLabel: `Undo Call ${call}`, destructive: false }))) return;
     setSaving(r.id);
     setMsg(null);
     try {
-      // Status only: the server copies the newest note on record, never the one this page loaded with.
       const res = await csrfFetch("/api/admin/follow-ups", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ targetType: TAB_TARGET[tab], targetId: r.id, status, keepNote: true }),
+        body: JSON.stringify({ targetType: TAB_TARGET[tab], targetId: r.id, call, done }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) return setMsg({ text: j.error ?? "Not saved. Try again.", bad: true });
-      setMsg({ text: `${titleOf(tab, r).title}: ${FOLLOW_UP_LABEL[status].toLowerCase()}.`, bad: false });
+      setMsg({ text: `${who}: Call ${call} ${done ? "marked done" : "undone"}.`, bad: false });
       router.refresh();
     } catch {
       setMsg({ text: "Network problem. Nothing was saved.", bad: true });
@@ -167,22 +171,7 @@ export function MasterDataView({
       );
     }
     if (c.key === "heat") return <HeatMark heat={r.heat} id={r.id} />;
-    if (c.key === "followUp") {
-      const cur = r.followUp?.status ?? "";
-      if (!canWrite) return cur ? <span className="text-foreground">{FOLLOW_UP_LABEL[cur]}</span> : <span className="text-text-subtle">-</span>;
-      return (
-        <select
-          aria-label={`Follow-up for ${titleOf(tab, r).title}`}
-          value={cur}
-          disabled={saving === r.id}
-          onChange={(e) => void setStatus(r, e.target.value as FollowUpStatus)}
-          className={cn(SELECT, "h-8 pr-7", cur === "escalated" && "border-accent-600 font-medium", !cur && "text-text-subtle")}
-        >
-          {cur ? null : <option value="" disabled>Set status</option>}
-          {FOLLOW_UP_STATUSES.map((s) => <option key={s} value={s}>{FOLLOW_UP_LABEL[s]}</option>)}
-        </select>
-      );
-    }
+    if (c.key === "followUp") return <FollowUpMarks f={r.followUp} canWrite={canWrite} busy={saving === r.id} onToggle={(n, d) => void setCall(r, n, d)} name={titleOf(tab, r).title} />;
     if (c.key === "lastSeenAt" && tab === "students") {
       const s = r as StudentRow;
       if (s.activityHidden) return <span className="text-text-subtle">Hidden</span>;
@@ -202,6 +191,7 @@ export function MasterDataView({
   const shown = visible.slice(0, limit);
   return (
     <div className="space-y-5">
+      {dialog}
       {/* KPI cards: each is a filter; its number is that filter's row count. */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {kpis.map((k) => {

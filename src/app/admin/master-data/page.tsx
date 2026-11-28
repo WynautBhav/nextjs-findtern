@@ -62,12 +62,12 @@ export default async function MasterDataPage({ searchParams }: { searchParams?: 
 
   const rows = (data[tab.key] ?? []) as AnyRow[];
   const hot = countWhere(rows, FILTERS[tab.key], { heat: "hot" });
-  const hotOpen = countWhere(rows, FILTERS[tab.key], { heat: "hot", followUp: "none" });
+  const hotOpen = countWhere(rows, FILTERS[tab.key], { heat: "hot", followUp: "nothing" });
   const finding = rows.length === 0
     ? `No ${tab.many} yet.`
     : hot === 0
       ? `${rows.length.toLocaleString("en-IN")} ${rows.length === 1 ? tab.one : tab.many}, none hot right now.`
-      : `${hot.toLocaleString("en-IN")} hot ${hot === 1 ? tab.one : tab.many}${hotOpen ? `, ${hotOpen.toLocaleString("en-IN")} with no follow-up yet` : ", all followed up"}. Highest first.`;
+      : `${hot.toLocaleString("en-IN")} hot ${hot === 1 ? tab.one : tab.many}${hotOpen ? `, ${hotOpen.toLocaleString("en-IN")} not nudged or called yet` : ", all followed up"}. Highest first.`;
 
   const items: AdminTabItem[] = allowed.map((t) => ({ key: t.key, label: t.label, href: `/admin/master-data?tab=${t.key}` }));
   const write = canWrite(perms, "/api/admin/follow-ups") && canWrite(perms, tab.page);

@@ -143,7 +143,7 @@ export const AUDIT_ACTIONS = {
   "export.cgpa": "Exported the CGPA checks",
   "cgpa.employer_confirmed": "An employer confirmed a candidate's corrected CGPA",
   "proposal.hired": "An offer became a hire",
-  "follow_up.set": "Set a follow-up status or note (Master data)",
+  "follow_up.set": "Ticked or undid a follow-up call (Master data)",
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

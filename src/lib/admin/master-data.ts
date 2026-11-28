@@ -12,7 +12,7 @@ import { sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { loadDashboardBoard } from "@/lib/admin/dashboard-board";
 import { aiInterviewStatus, hiredWhere, openProject, realEmployers } from "@/lib/admin/scope";
-import { latestFollowUps, type FollowUp, type FollowUpTarget } from "@/lib/admin/follow-ups";
+import { callsByTarget, followUpOf, type CallMark, type FollowUpTarget } from "@/lib/admin/follow-ups";
 import { loadSubscriptionRows } from "@/lib/subscription/admin-list-load";
 import { acceptedPayOf, proposalPipelineStatus } from "@/lib/admin/proposal-pipeline";
 import { loadExpiredSources } from "@/lib/admin/expired-load";
@@ -57,13 +57,13 @@ export async function loadNudgeRows(): Promise<NudgeSourceRow[]> {
 }
 
 /** The current follow-up (newest log row) per target of one type, with the writing admin's name. */
-export async function loadFollowUps(type: FollowUpTarget): Promise<Map<string, FollowUp>> {
+/** Call 1 / Call 2 per target of one type, from the whole call log (the newest row per call wins, follow-ups.ts callsOf). */
+export async function loadFollowUps(type: FollowUpTarget): Promise<Map<string, { call1: CallMark | null; call2: CallMark | null }>> {
   const r = await getDb().execute(sql`
-    SELECT DISTINCT ON (f.target_id) f.target_id, f.status, f.note, f.created_at, a.name AS by
+    SELECT f.target_id, f.status, f.note, f.created_at, a.name AS by
       FROM ${schema.adminFollowUps} f LEFT JOIN ${schema.admins} a ON a.id = f.admin_id
-     WHERE f.target_type = ${type}
-     ORDER BY f.target_id, f.created_at DESC`);
-  return latestFollowUps((r.rows as Record<string, unknown>[]).map((x) => ({ targetId: String(x.target_id), status: String(x.status), note: str(x.note), createdAt: x.created_at as Date, by: str(x.by) })));
+     WHERE f.target_type = ${type}`);
+  return callsByTarget((r.rows as Record<string, unknown>[]).map((x) => ({ targetId: String(x.target_id), status: String(x.status), note: str(x.note), createdAt: x.created_at as Date, by: str(x.by) })));
 }
 
 export type OfferFact = OfferBucketIn & { id: string; internId: string; employerId: string; createdAt: string | null };
@@ -122,7 +122,8 @@ export async function loadStudentRows(now: Date): Promise<StudentRow[]> {
       ppo: hiredOffers.some((o) => o.track === "full_time" && o.ppo),
     };
     const isHired = hiredOffers.length > 0;
-    const followUp = followUps.get(s.id) ?? null;
+    // Nudge is derived from the admin-nudge tally, the same rows as the Findtern nudge count.
+    const followUp = followUpOf(followUps.get(s.id), tallies.get(s.id)?.lastFindtern ?? null, true);
     const lastMoveAt = latest(t, s.lastSeenAt, s.createdAt, ...mine.map((o) => o.createdAt), ...meets.map((m) => m.startsAt));
     return {
       id: s.id, name: s.name, email: s.email, phone: s.phone, college: s.college, city: city.get(s.id) ?? null,
@@ -184,7 +185,7 @@ export async function loadEmployerRows(now: Date): Promise<EmployerRow[]> {
     const activityHidden = f.show_activity === false;
     const lastActiveAt = activityHidden ? null : iso(f.last_seen_at);
     const createdAt = iso(f.created_at);
-    const followUp = followUps.get(id) ?? null;
+    const followUp = followUpOf(followUps.get(id), tallies.get(id)?.lastFindtern ?? null, true);
     const lastMoveAt = latest(t, lastActiveAt, createdAt, iso(f.project_at), ...mine.map((o) => o.createdAt), ...mm.map((m) => m.startsAt));
     return {
       id, company: String(f.company_name ?? ""), contact: str(f.name), email: str(f.company_email),
@@ -252,7 +253,8 @@ export async function loadCollegeRows(now: Date): Promise<CollegeRow[]> {
   return (raw.rows as Record<string, unknown>[]).map((c) => {
     const id = String(c.id);
     const a = agg.get(id);
-    const followUp = followUps.get(id) ?? null;
+    // Admin nudges reach students and employers only (/api/admin/notifications): a college has no Nudge mark.
+    const followUp = followUpOf(followUps.get(id), null, false);
     const lastTpoAt = iso(c.last_tpo_at);
     const row = {
       id, name: String(c.name), city: str(c.city), partner: Boolean(c.is_partner),
