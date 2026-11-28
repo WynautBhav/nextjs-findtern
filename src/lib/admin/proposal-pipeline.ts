@@ -67,9 +67,36 @@ export function acceptedPayOf(bucket: PipelineBucket, storedStatus: string): Acc
   return storedStatus === "processing" ? "processing" : "unpaid";
 }
 
-/** The `pay=` URL value; it only means something under `status=accepted`. */
-export function parsePayFilter(v: string | undefined | null): AcceptedPay | "" {
-  return (ACCEPTED_PAY as readonly string[]).includes(v ?? "") ? (v as AcceptedPay) : "";
+/**
+ * The `pay=` URL value. Only `unpaid` is a filter (the sidebar badge and the dashboard's "Needs you" queue link to
+ * `?status=accepted&pay=unpaid`); the page shows it as a removable tag, not as a part of the Accepted card. Anything else is ignored.
+ */
+export function parsePayFilter(v: string | undefined | null): "unpaid" | "" {
+  return v === "unpaid" ? "unpaid" : "";
+}
+
+/** Proposal type: full-time when the offer carries a full-time block (parseOffer fullTime; a PPO is full-time), else internship. */
+export const PIPELINE_TYPES = ["internship", "fulltime"] as const;
+export type PipelineType = (typeof PIPELINE_TYPES)[number];
+export const PIPELINE_TYPE_LABEL: Record<PipelineType, string> = { internship: "Internship", fulltime: "Full-time" };
+
+export function proposalTypeOf(offerDetails: unknown, currency: string | null = null): PipelineType {
+  return parseOffer(offerDetails, currency).fullTime ? "fulltime" : "internship";
+}
+
+/** The `type=` URL value, kept only when it names a type. */
+export function parsePipelineType(v: string | undefined | null): PipelineType | "" {
+  return (PIPELINE_TYPES as readonly string[]).includes(v ?? "") ? (v as PipelineType) : "";
+}
+
+/**
+ * The type control's counts and the rows it leaves, from one pass: each segment's count is the Total sent card (and the
+ * table, with no outcome card pressed) when that segment is picked.
+ */
+export function pipelineByType<R extends { type: PipelineType }>(rows: R[], type: PipelineType | "") {
+  const counts = { all: rows.length, internship: 0, fulltime: 0 };
+  for (const r of rows) counts[r.type] += 1;
+  return { counts, rows: type ? rows.filter((r) => r.type === type) : rows };
 }
 
 /**
@@ -77,7 +104,7 @@ export function parsePayFilter(v: string | undefined | null): AcceptedPay | "" {
  * number of rows the table shows when that card is pressed, the buckets add up to `total`, and the Accepted parts add up to
  * the Accepted card.
  */
-export function pipelineView<R extends { bucket: PipelineBucket; pay?: AcceptedPay | null }>(rows: R[], status: PipelineBucket | "", pay: AcceptedPay | "" = "") {
+export function pipelineView<R extends { bucket: PipelineBucket; pay?: AcceptedPay | null }>(rows: R[], status: PipelineBucket | "", pay: "unpaid" | "" = "") {
   const counts = Object.fromEntries(PIPELINE_BUCKETS.map((b) => [b, 0])) as Record<PipelineBucket, number>;
   const acceptedPay = { unpaid: 0, processing: 0 } as Record<AcceptedPay, number>;
   for (const r of rows) {

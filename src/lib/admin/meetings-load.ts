@@ -10,9 +10,9 @@ import { realEmployers } from "@/lib/admin/scope";
 import { MEETING_MINUTES as CALL_MINUTES } from "@/lib/college/constants";
 import { meetingDetail } from "@/lib/admin/dashboard-board-pure";
 import { meetingStage, pickedSlot, type MeetingRow } from "@/lib/admin/meeting-stage";
+import { meetingTrack } from "@/lib/admin/offer-track";
 
 export type { MeetingRow };
-import { parseOffer } from "@/lib/offer";
 
 
 /**
@@ -28,7 +28,7 @@ export function meetingEmployerScope(employerIdCol: SQLWrapper): SQL {
  * SQL twin of needsMeetingLink (meeting-stage.ts) over the unaliased `interviews` table: a real employer's interview
  * that is booked (scheduled with a picked slot) and still Upcoming by the stage rule (meetOutcome reads a booked
  * meeting as over CALL_MINUTES after it starts, before interviewLifecycle's 30), with no link saved. The dashboard
- * queue and the rail badge count this; /admin/meetings?nolink=1 lists the same rows.
+ * queue and the rail badge count this; /admin/proposal-tracker?view=meetings&nolink=1 lists the same rows.
  */
 export function meetingsNoLinkWhere(): SQL {
   const iv = schema.interviews;
@@ -58,7 +58,7 @@ export async function loadMeetings(now: Date = new Date()): Promise<{ rows: Meet
              u.first_name, u.last_name, ${schema.employers.companyName} AS company_name,
              pj.project_name, pj.full_time_offer,
              pr.id AS proposal_id, pr.offer_details, pr.currency,
-             coalesce(pd.title, cd.title) AS drive_title, (pr.drive_id IS NOT NULL OR cd.id IS NOT NULL) AS campus
+             coalesce(pd.title, cd.title) AS drive_title, cd.kind AS cd_kind, (pr.drive_id IS NOT NULL OR cd.id IS NOT NULL) AS campus
         FROM interviews i
         JOIN ${schema.employers} ON ${schema.employers.id} = i.employer_id
         LEFT JOIN users u ON u.id = i.intern_id
@@ -67,7 +67,7 @@ export async function loadMeetings(now: Date = new Date()): Promise<{ rows: Meet
         LEFT JOIN college_drives pd ON pd.id = pr.drive_id
         -- The company was in a drive of the student's college when it sent the invite (the window drive-interviews-db.ts uses).
         LEFT JOIN LATERAL (
-          SELECT d.id, d.title FROM college_drive_employers j
+          SELECT d.id, d.title, d.kind FROM college_drive_employers j
             JOIN college_drives d ON d.id = j.drive_id
             JOIN college_memberships m ON m.college_id = d.college_id AND m.user_id = i.intern_id AND m.left_at IS NULL
            WHERE j.employer_id = i.employer_id AND i.created_at >= d.starts_at AND i.created_at <= least(d.ends_at, coalesce(d.revoked_at, d.ends_at))
@@ -92,10 +92,11 @@ export async function loadMeetings(now: Date = new Date()): Promise<{ rows: Meet
     };
     const stage = meetingStage(m, NOW);
     if (stage === null) continue;
-    const fullTime = r.full_time_offer === true || (r.proposal_id ? parseOffer(r.offer_details, str(r.currency)).fullTime !== null : false);
+    // Type: the linked offer, else the matched campus drive's kind, else Internship; the project's flag is the employer's "full-time after the internship" answer (offer-track.ts).
+    const { track, ftAfterInternship } = meetingTrack(r.proposal_id ? { offerDetails: r.offer_details, currency: str(r.currency) } : null, str(r.cd_kind), r.full_time_offer === true);
     rows.push({
       id: String(r.id), kind: "interview", stage, internId: String(r.intern_id), candidate: nameOf(r), employerId: String(r.employer_id),
-      company: String(r.company_name ?? ""), projectId: str(r.project_id), project: str(r.project_name), track: fullTime ? "full_time" : "internship",
+      company: String(r.company_name ?? ""), projectId: str(r.project_id), project: str(r.project_name), track, ftAfterInternship,
       campus: r.campus === true, driveTitle: str(r.drive_title), round: r.round == null ? null : Number(r.round), status: m.status,
       slots: [m.slot1, m.slot2, m.slot3].filter((d): d is Date => d !== null).map((d) => d.toISOString()), startsAt: iso(pickedSlot(m)),
       timezone: str(r.timezone), proposedBy: str(r.proposed_by), respondBy: iso(r.respond_by), meetingLink: str(r.meeting_link),
@@ -110,7 +111,7 @@ export async function loadMeetings(now: Date = new Date()): Promise<{ rows: Meet
     if (stage === null) continue;
     rows.push({
       id: String(r.id), kind: "call", stage, internId: String(r.user_id), candidate: nameOf(r), employerId: String(r.employer_id),
-      company: String(r.company_name ?? ""), projectId: null, project: null, track: r.drive_kind === "full_time" ? "full_time" : "internship",
+      company: String(r.company_name ?? ""), projectId: null, project: null, track: r.drive_kind === "full_time" ? "full_time" : "internship", ftAfterInternship: false,
       campus: true, driveTitle: str(r.drive_title), round: null, status, slots: r.starts_at ? [iso(r.starts_at)!] : [], startsAt: iso(r.starts_at),
       timezone: null, proposedBy: "employer", respondBy: null, meetingLink: str(r.meeting_link), employerJoinedAt: null, cancelledBy: null,
       cancelReason: null, notes: null, ...meetingDetail({ stage, cancelledBy: null, cancelReason: null, notes: null }),

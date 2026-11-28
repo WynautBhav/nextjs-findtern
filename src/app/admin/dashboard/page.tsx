@@ -70,7 +70,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
             </ButtonLink>
             {can("/admin/proposal-tracker") ? (
               <ButtonLink href="/admin/proposal-tracker" variant="outline" size="md" className={ADMIN_PILL_SECONDARY}>
-                Proposal pipeline
+                Pipeline
               </ButtonLink>
             ) : null}
           </>

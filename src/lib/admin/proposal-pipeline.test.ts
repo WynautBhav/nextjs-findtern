@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { offerReplyOf } from "./dashboard-board-pure.ts";
-import { ACCEPTED_PAY, PIPELINE_BUCKETS, acceptedPayOf, isPpoOffer, parsePayFilter, pipelinePay, parsePipelineStatus, pipelineCsv, pipelineView, proposalPipelineStatus, type PipelineBucket } from "./proposal-pipeline.ts";
+import { PIPELINE_BUCKETS, acceptedPayOf, isPpoOffer, parsePayFilter, parsePipelineType, pipelineByType, pipelinePay, proposalTypeOf, parsePipelineStatus, pipelineCsv, pipelineView, proposalPipelineStatus, type PipelineBucket } from "./proposal-pipeline.ts";
 
 const now = new Date("2026-11-28T12:00:00+05:30");
 const future = { startDate: "2099-01-01" };
@@ -97,6 +97,7 @@ test("Accepted splits into waiting on payment and payment under way; each part e
   assert.equal(acceptedPayOf("hired", "hired"), null);
   assert.equal(parsePayFilter("unpaid"), "unpaid");
   assert.equal(parsePayFilter("paid"), "");
+  assert.equal(parsePayFilter("processing"), ""); // no longer a filter: ignored
   const rows = [
     ...Array.from({ length: 3 }, (_, i) => ({ id: `u${i}`, bucket: "accepted" as const, pay: "unpaid" as const })),
     ...Array.from({ length: 2 }, (_, i) => ({ id: `p${i}`, bucket: "accepted" as const, pay: "processing" as const })),
@@ -106,9 +107,35 @@ test("Accepted splits into waiting on payment and payment under way; each part e
   const all = pipelineView(rows, "accepted");
   assert.equal(all.rows.length, 5);
   assert.equal(all.acceptedPay.unpaid + all.acceptedPay.processing, all.counts.accepted);
-  for (const k of ACCEPTED_PAY) {
-    const v = pipelineView(rows, "accepted", k);
-    assert.equal(v.rows.length, all.acceptedPay[k], k);
-  }
+  const unpaid = pipelineView(rows, "accepted", "unpaid");
+  assert.equal(unpaid.rows.length, all.acceptedPay.unpaid); // the tag's count is the rows it shows
+  assert.equal(unpaid.rows.length, 3);
+  assert.equal(unpaid.counts.accepted, 5); // the Accepted card is not narrowed by the tag
   assert.equal(pipelineView(rows, "hired", "unpaid").rows.length, 1); // pay only narrows Accepted
+});
+
+test("type: PPO counts as full-time; segments add up and each equals the cards' total when picked", () => {
+  const ft = { fullTimeOffer: { jobTitle: "SDE", annualCtcMinor: 70000000 } };
+  const ppo = { fullTimeOffer: { jobTitle: "SDE", annualCtcMinor: 70000000, baseProposalId: "p1" } };
+  const intern = { startDate: "2099-01-01", monthlyAmount: 26400 };
+  assert.equal(proposalTypeOf(ft), "fulltime");
+  assert.equal(proposalTypeOf(ppo), "fulltime");
+  assert.equal(proposalTypeOf(intern), "internship");
+  assert.equal(parsePipelineType("fulltime"), "fulltime");
+  assert.equal(parsePipelineType("full_time"), "");
+  const rows = [
+    ...Array.from({ length: 4 }, (_, i) => ({ id: `i${i}`, type: proposalTypeOf(intern), bucket: (i % 2 ? "pending" : "hired") as "pending" | "hired" })),
+    ...Array.from({ length: 2 }, (_, i) => ({ id: `f${i}`, type: proposalTypeOf(ft), bucket: "pending" as const })),
+    { id: "ppo", type: proposalTypeOf(ppo), bucket: "hired" as const },
+  ];
+  const all = pipelineByType(rows, "");
+  assert.deepEqual(all.counts, { all: 7, internship: 4, fulltime: 3 });
+  for (const t of ["internship", "fulltime"] as const) {
+    const picked = pipelineByType(rows, t);
+    const cards = pipelineView(picked.rows, "");
+    assert.equal(cards.total, all.counts[t]);
+    assert.equal(picked.counts.all, 7); // picking a type never changes the segments
+    assert.equal(pipelineView(picked.rows, "pending").rows.length, cards.counts.pending);
+  }
+  assert.equal(pipelineView(pipelineByType(rows, "fulltime").rows, "hired").rows.length, 1); // the PPO
 });

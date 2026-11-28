@@ -51,9 +51,12 @@ const PROMO_W: Permission[] = ["transactions:write", "cms:write"];
 const RULES: Rule[] = [
   // pages
   ["/admin/dashboard", ["dashboard:read"]],
-  ["/admin/proposal-tracker", ["interns:read"], ["interns:write"]],
+  // Pipeline: one page, two views. The page admits either side; the Proposals view itself checks interns:read in the page
+  // and the Meetings view the /admin/meetings rule below. A single proposal's page stays interns:read.
+  ["/admin/proposal-tracker", ["interns:read", "companies:read"], ["interns:write"]],
+  ["/admin/proposal-tracker/", ["interns:read"], ["interns:write"]],
   ["/admin/ai-interviews", ["interns:read"], ["interns:write"]],
-  // Meeting pipeline: real interviews and drive calls (both sides take part), like meeting reviews.
+  // Meetings (the Pipeline's Meetings view; /admin/meetings redirects there): real interviews and drive calls (both sides take part).
   ["/admin/meetings", ["interns:read", "companies:read"], ["interns:write", "companies:write"]],
   // Master data: students, employers and colleges in one place; follow-ups are written through /api/admin/follow-ups.
   ["/admin/master-data", ["interns:read", "companies:read"], ["interns:write", "companies:write"]],
@@ -108,6 +111,8 @@ const RULES: Rule[] = [
   ["/api/admin/subscriptions", ["transactions:read"], ["transactions:write"]],
   // The expired-offers and expired-AI-interviews CSV (tracker and AI interviews tabs).
   ["/api/admin/expired", ["interns:read"]],
+  // One proposal as a PDF (Projects offers pop-up): read only, the offer's candidate and pay.
+  ["/api/admin/proposals", ["interns:read"]],
   ["/api/admin/company", COMPANY_LEGAL_R, COMPANY_LEGAL_W],
   ["/api/admin/companies", ["companies:read"], ["companies:write"]],
   ["/api/admin/colleges", ["companies:read"], ["companies:write"]],
@@ -118,6 +123,9 @@ const RULES: Rule[] = [
   ["/api/admin/drive-overview", ["companies:read"], ["companies:write"]],
   ["/api/admin/refunds", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/projects", ["companies:read"], ["companies:write"]],
+  // A project's offers pop-up and its CSV carry the interns' names, contacts and pay: candidate data, so interns:read
+  // (its own prefix, not under /api/admin/projects, which companies:read opens). Read only; no write rule.
+  ["/api/admin/project-offers", ["interns:read"]],
   ["/api/admin/follow-ups", ["interns:read", "companies:read"], ["interns:write", "companies:write"]],
   ["/api/admin/users", ["users:read"], ["interns:write"]],
   ["/api/admin/contact", ["users:read"], ["interns:write", "companies:write"]],

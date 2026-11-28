@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 
 import { isHiredProposal } from "@/lib/hire-status";
 import { AdminTabs } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
-import { AdminEmpty, Panel } from "@/components/admin/panel";
 import { ProposalRecords, type PipelineItem } from "@/components/admin/proposal-pipeline-records";
 import { StatusBadge } from "@/components/admin/status-badge";
 import type { ToolbarFilter } from "@/components/admin/table-toolbar";
@@ -23,8 +21,7 @@ import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
  * table under the KPI cards (proposal-pipeline-records.tsx).
  */
 
-// `interviews` stays a valid key so old links land on the "moved" note instead of the main view.
-export const TRACKER_TABS = ["proposals", "candidates", "companies", "expired", "interviews"] as const;
+export const TRACKER_TABS = ["proposals", "candidates", "companies", "expired"] as const;
 export type TrackerTab = (typeof TRACKER_TABS)[number];
 
 type ProposalItem = PipelineItem;
@@ -89,35 +86,16 @@ export function ProposalTrackerView({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-x-6 gap-y-1 xl:flex-row xl:items-end xl:justify-between">
-        <AdminTabs
-          label="Pipeline view"
-          className="min-w-0 xl:flex-1"
-          items={tabs.map((t) => ({ ...t, href: `${BASE}${toQueryString({ ...keep, tab: t.key === "proposals" ? "" : t.key })}` }))}
-          active={tab}
-        />
-        <Link
-          href="/admin/meetings"
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-sm font-medium text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          Meetings moved to Meeting pipeline
-          <ArrowRight className="size-4" aria-hidden />
-        </Link>
-      </div>
+      <AdminTabs
+        label="Proposal views"
+        items={tabs.map((t) => ({ ...t, href: `${BASE}${toQueryString({ ...keep, tab: t.key === "proposals" ? "" : t.key })}` }))}
+        active={tab}
+      />
 
       {tab === "proposals" ? <ProposalRecords {...{ params, page, perPage, search, pickers }} rows={proposals} /> : null}
       {tab === "companies" ? <CompaniesTab {...{ params, page, perPage, search, pickers, proposals, interviews }} employers={activeCompanies} /> : null}
       {tab === "candidates" ? <CandidatesTab {...{ params, page, perPage, search, pickers, proposals, noGuarantee }} /> : null}
       {tab === "expired" ? <ExpiredTab {...{ params, page, perPage, search, pickers }} rows={expired} /> : null}
-      {tab === "interviews" ? (
-        <Panel>
-          <AdminEmpty
-            title="Meetings moved to Meeting pipeline"
-            body="Interviews and meetings now have their own page, with the same company and candidate filters."
-            action={{ href: "/admin/meetings", label: "Open Meeting pipeline" }}
-          />
-        </Panel>
-      ) : null}
     </div>
   );
 }
@@ -200,7 +178,7 @@ function CompaniesTab({
           header: "Interviews",
           sort: "interviews",
           align: "right",
-          // Meetings live on the Meeting pipeline now; the count stays for the company's picture.
+          // Meetings live in the Pipeline's Meetings view; the count stays for the company's picture.
           cell: (r) => r.interviews,
         },
         { header: "Accepted or hired", align: "right", cell: (r) => r.won },

@@ -65,6 +65,14 @@ export function restoresToActive(status: string | null | undefined): boolean {
   return lifecycleOf(status) === "published";
 }
 
+/**
+ * Every Findtern project is an internship. projects.fullTimeOffer is the employer's answer to "Full-time role after the
+ * internship" (the employer project form), not the engagement: the row, the CSV and the filter show it as that answer.
+ */
+export function engagementOf(p: { fullTimeOffer: boolean | null | undefined }): { engagement: "Internship"; ftAfterInternship: "Yes" | "No" } {
+  return { engagement: "Internship", ftAfterInternship: p.fullTimeOffer === true ? "Yes" : "No" };
+}
+
 export type ProjectView = "all" | "active" | "deactivated" | "full_time";
 export const PROJECT_VIEWS: readonly ProjectView[] = ["all", "active", "deactivated", "full_time"];
 

@@ -203,6 +203,8 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "export.projects": { rows: 5, filters: { type: "projects", status: "active" } },
   "export.meetings": { rows: 3, filters: { stage: "expired", source: "campus" } },
   "export.proposals": { rows: 14, filters: { type: "proposals", status: "hired" } },
+  "export.proposal_pdf": { internId: "i-1", outcome: "hired" },
+  "export.project_offers": { rows: 9, filters: { outcome: "hired" } },
   "export.cgpa": { rows: 3, filters: { filter: "pending", q: "" } },
   "cgpa.employer_confirmed": { internId: "i-1", proposalId: "pr-1", employerId: "e-1", correctedScore: "7.9" },
   "proposal.hired": { proposalId: "pr-1", employerId: "e-1", internId: "i-1", orderId: "ord-1", paymentRowId: "pay-1" },

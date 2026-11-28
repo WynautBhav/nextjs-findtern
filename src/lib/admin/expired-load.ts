@@ -39,12 +39,21 @@ export async function loadExpiredSources(now: Date = new Date()): Promise<{ rows
       .leftJoin(schema.employers, eq(schema.employers.id, p.employerId))
       .leftJoin(schema.projects, eq(schema.projects.id, p.projectId))
       .where(and(realEmployerId(p.employerId), inArray(p.status, ["sent", "interview_scheduled", "accepted", "expired", "withdrawn"]))),
-    db
-      .select({ raw: schema.employerPayments.raw })
-      .from(schema.employerPayments)
-      .where(and(eq(schema.employerPayments.status, "created"), gte(schema.employerPayments.createdAt, new Date(now.getTime() - OPEN_ORDER_MINUTES * 60_000)))),
+    loadOpenOrderIds(now),
   ]);
-  return { rows, openOrderIds: new Set(orders.flatMap((o) => orderProposalIds(o.raw))) };
+  return { rows, openOrderIds: orders };
+}
+
+/**
+ * Offers held by an unpaid checkout opened in the last OPEN_ORDER_MINUTES (the open-checkout freeze). Only the recent
+ * open orders are read, so a caller that needs just this set (one project's offers) does not scan every offer.
+ */
+export async function loadOpenOrderIds(now: Date = new Date()): Promise<Set<string>> {
+  const orders = await getDb()
+    .select({ raw: schema.employerPayments.raw })
+    .from(schema.employerPayments)
+    .where(and(eq(schema.employerPayments.status, "created"), gte(schema.employerPayments.createdAt, new Date(now.getTime() - OPEN_ORDER_MINUTES * 60_000))));
+  return new Set(orders.flatMap((o) => orderProposalIds(o.raw)));
 }
 
 /** Expired offers at `now`: the one definition (tracker.expiredProposals) over the loaded rows. */

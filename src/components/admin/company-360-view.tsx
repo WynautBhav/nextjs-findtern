@@ -27,6 +27,7 @@ import { StatCard } from "@/components/admin/stat-card";
 import { ProjectDetailsButton } from "@/components/admin/project-details";
 import { normalizeStatus } from "@/lib/projects/lifecycle";
 import { STATUS_ORDER, statusMeta } from "@/app/employer/projects/status";
+import { engagementOf } from "@/lib/admin/projects-board-pure";
 
 /**
  * Company 360 (legacy admin-company-detail.tsx): a profile first (ADP-04),
@@ -269,7 +270,7 @@ export function Company360View({
                 );
               },
             },
-            { header: "Full-time", cell: (p) => (p.fullTimeOffer ? "Yes" : "No") },
+            { header: "Full-time after internship", cell: (p) => engagementOf(p).ftAfterInternship },
             { header: "Status", cell: (p) => <StatusBadge value={isOpenProject(p) ? "active" : p.status || "closed"} label={statusMeta(p.status || "published").label} /> },
             { header: "Posted", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.createdAt)}</span> },
             { header: "Details", cell: (p) => <ProjectDetailsButton project={p} /> },

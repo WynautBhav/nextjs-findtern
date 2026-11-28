@@ -72,6 +72,8 @@ export type MeetingRow = {
   projectId: string | null;
   project: string | null;
   track: "internship" | "full_time";
+  /** The project's "full-time role after the internship" answer (projects.fullTimeOffer); a note only, never the type. */
+  ftAfterInternship?: boolean;
   /** A campus drive call, or an interview from a drive (its offer came through a drive, or the company was in a drive of the student's college then). */
   campus: boolean;
   driveTitle: string | null;

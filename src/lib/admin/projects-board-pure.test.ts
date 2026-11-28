@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { activeToggle, matchesView, payLines, paySummary, projectStatus, restoresToActive, viewCounts, type ViewRow } from "./projects-board-pure.ts";
+import { activeToggle, engagementOf, matchesView, payLines, paySummary, projectStatus, restoresToActive, viewCounts, type ViewRow } from "./projects-board-pure.ts";
 
 const down = new Date("2026-11-20T10:00:00Z");
 
@@ -89,4 +89,10 @@ test("a padded or upper-case status reads the same as a clean one (SQL twins tri
     { status: " paused", takenDownAt: null, fullTimeOffer: false },
   ];
   assert.deepEqual(viewCounts(rows), { all: 3, active: 2, deactivated: 0, full_time: 1 });
+});
+
+test("engagement: a project is always an internship; the full-time flag is the employer's after-internship answer", () => {
+  assert.deepEqual(engagementOf({ fullTimeOffer: true }), { engagement: "Internship", ftAfterInternship: "Yes" });
+  assert.deepEqual(engagementOf({ fullTimeOffer: false }), { engagement: "Internship", ftAfterInternship: "No" });
+  assert.deepEqual(engagementOf({ fullTimeOffer: null }), { engagement: "Internship", ftAfterInternship: "No" });
 });

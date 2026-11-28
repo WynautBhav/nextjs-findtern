@@ -73,7 +73,7 @@ const META: Record<QueueKey, Meta> = {
     key: "nolink",
     label: "Upcoming interviews with no meeting link",
     detail: "Neither side can join until a link is saved.",
-    moreHref: "/admin/meetings?nolink=1",
+    moreHref: "/admin/proposal-tracker?view=meetings&nolink=1",
     moreLabel: "Add links",
   },
   unscored: {
@@ -277,7 +277,7 @@ async function loadAccepted(now: Date): Promise<Result & Pick<MoneyStuck, "owedB
 async function loadNoLink(weekAgo: Date): Promise<Result> {
   const db = getDb();
   const iv = schema.interviews;
-  // The same rows /admin/meetings?nolink=1 lists (meeting-stage.ts needsMeetingLink).
+  // The same rows the Pipeline's Meetings view lists with ?nolink=1 (meeting-stage.ts needsMeetingLink).
   const where = meetingsNoLinkWhere();
   const [[agg], rows] = await Promise.all([
     db
@@ -314,7 +314,7 @@ async function loadNoLink(weekAgo: Date): Promise<Result> {
       amountMinorInr: null,
       ageDays: null,
       when: isoOrNull(slot),
-      href: "/admin/meetings?nolink=1",
+      href: "/admin/proposal-tracker?view=meetings&nolink=1",
       props: [
         { label: "Slot", value: slotText },
         { label: "Company", value: company || "Not recorded" },

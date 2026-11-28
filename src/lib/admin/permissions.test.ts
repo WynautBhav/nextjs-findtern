@@ -182,3 +182,22 @@ test("canonicalRoleKey matches a stored role to its role row ignoring case and s
   assert.equal(canonicalRoleKey("ghost", keys), "ghost");
   assert.equal(canonicalRoleKey(null, keys), "");
 });
+
+test("Pipeline: either side opens the page, but a single proposal stays interns:read; meetings export keeps its rule", () => {
+  assert.equal(allows(["companies:read"], requiredPermissions("/admin/proposal-tracker")), true); // lands on the Meetings view
+  assert.equal(allows(["interns:read"], requiredPermissions("/admin/proposal-tracker")), true);
+  assert.equal(allows(["companies:read"], requiredPermissions("/admin/proposal-tracker/p-123")), false);
+  assert.equal(allows(["interns:read"], requiredPermissions("/admin/proposal-tracker/p-123")), true);
+  assert.equal(allows(["transactions:read"], requiredPermissions("/admin/proposal-tracker")), false);
+  assert.deepEqual(requiredPermissions("/api/admin/meetings/export"), ["interns:read", "companies:read"]);
+  assert.equal(canWrite(["companies:write"], "/admin/proposal-tracker"), false);
+});
+
+test("a project's offers and a proposal PDF carry intern contacts and pay: interns:read, not companies:read", () => {
+  for (const path of ["/api/admin/project-offers/x", "/api/admin/proposals/x/pdf"]) {
+    assert.equal(allows(["companies:read", "companies:write"], requiredPermissions(path)), false, path);
+    assert.equal(allows(["interns:read"], requiredPermissions(path)), true, path);
+  }
+  // The projects list and its takedown stay companies work.
+  assert.equal(allows(["companies:read"], requiredPermissions("/api/admin/projects/x/takedown")), true);
+});

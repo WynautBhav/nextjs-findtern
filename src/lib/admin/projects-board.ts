@@ -3,9 +3,10 @@ import { and, count, countDistinct, desc, eq, inArray, max, ne, not, sql, type S
 import { getDb, schema } from "@/lib/db";
 import { scopeLabel } from "@/lib/db/schema";
 import { parsePageRequest, searchAny, toQueryString } from "@/lib/admin/params";
-import { hiredWhere, openProject, realEmployerId, trimmedStatus } from "@/lib/admin/scope";
+import { openProject, realEmployerId, trimmedStatus } from "@/lib/admin/scope";
 import { TAKEDOWN_WITHDRAW_STATUSES } from "@/lib/projects/takedown";
 import { exportRows } from "./projects-board-export.ts";
+import { offerBucket, offerCounts } from "./project-offers-pure.ts";
 import { paySummary, PROJECT_VIEWS, type PaySummary, type ProjectView } from "./projects-board-pure.ts";
 
 /**
@@ -36,7 +37,8 @@ export const MODE_FILTERS = [
 export interface ProjectsQuery {
   q: string;
   status: string;
-  type: string;
+  /** The employer's answer to "Full-time role after the internship" (projects.fullTimeOffer): yes, no or any. */
+  ft: "yes" | "no" | "";
   mode: string;
   city: string;
   sort: CompanySort;
@@ -50,7 +52,8 @@ export function parseProjectsQuery(params: Record<string, string>): ProjectsQuer
   return {
     q: search.slice(0, 200),
     status: pick(STATUS_FILTERS, params.status),
-    type: params.type === "full_time" || params.type === "internship" ? params.type : "",
+    // Old links carried it as type=full_time|internship.
+    ft: params.ft === "yes" || params.ft === "no" ? params.ft : params.type === "full_time" ? "yes" : params.type === "internship" ? "no" : "",
     mode: pick(MODE_FILTERS, params.mode),
     city: (params.city ?? "").replaceAll("\u0000", "").trim().slice(0, 100),
     sort: (COMPANY_SORTS as readonly string[]).includes(params.sort ?? "") ? (params.sort as CompanySort) : "projects",
@@ -89,7 +92,7 @@ export function projectFilters(query: Omit<ProjectsQuery, "sort" | "page">): SQL
     realEmployerId(P.employerId),
     searchAny([sql`${P.projectName}`, sql`${schema.employers.companyName}`, sql`${P.skills}::text`], query.q),
     query.status ? STATUS_SQL[query.status] : undefined,
-    query.type === "full_time" ? VIEW_SQL.full_time : query.type === "internship" ? sql`coalesce(${P.fullTimeOffer}, false) = false` : undefined,
+    query.ft === "yes" ? VIEW_SQL.full_time : query.ft === "no" ? sql`coalesce(${P.fullTimeOffer}, false) = false` : undefined,
     query.mode ? sql`lower(trim(coalesce(${P.locationType}, ''))) = ${query.mode}` : undefined,
     query.city ? sql`lower(trim(coalesce(${P.city}, ''))) = ${query.city.toLowerCase()}` : undefined,
   ];
@@ -222,20 +225,26 @@ export async function loadProjectsBoard(query: ProjectsQuery, opts: { all?: bool
         db
           .select({
             projectId: pr.projectId,
-            sent: sql<number>`count(*) filter (where ${pr.status} <> 'draft')::int`,
-            hires: sql<number>`count(*) filter (where ${hiredWhere("proposals")})::int`,
             open: sql<number>`count(*) filter (where ${inArray(pr.status, [...TAKEDOWN_WITHDRAW_STATUSES])} and ${pr.hiredAt} is null)::int`,
           })
           .from(pr)
           .where(inArray(pr.projectId, projectIds))
           .groupBy(pr.projectId),
         db
-          .select({ projectId: pr.projectId, status: pr.status, currency: pr.currency, offerDetails: pr.offerDetails })
+          .select({ projectId: pr.projectId, status: pr.status, hiredAt: pr.hiredAt, currency: pr.currency, offerDetails: pr.offerDetails })
           .from(pr)
           .where(and(inArray(pr.projectId, projectIds), ne(pr.status, "draft"))),
       ])
     : [[], []];
   const statOf = new Map(stats.map((s) => [s.projectId, s]));
+  const now = new Date();
+  const countsOf = (rows: typeof offers) => {
+    const c = offerCounts(rows.flatMap((o) => {
+      const bucket = offerBucket(o, now);
+      return bucket ? [{ bucket }] : [];
+    }));
+    return { offersSent: c.sent, hires: c.hires };
+  };
   const offersOf = new Map<string, typeof offers>();
   for (const o of offers) offersOf.set(o.projectId, [...(offersOf.get(o.projectId) ?? []), o]);
 
@@ -257,8 +266,8 @@ export async function loadProjectsBoard(query: ProjectsQuery, opts: { all?: bool
       takenDownAt: iso(p.takenDownAt),
       takenDownReason: p.takenDownReason,
       createdAt: iso(p.createdAt),
-      offersSent: Number(s?.sent ?? 0),
-      hires: Number(s?.hires ?? 0),
+      // The same rows (project_id, status <> 'draft') and buckets the offers pop-up lists: sent = its rows, hires = its Hired chip.
+      ...countsOf(offersOf.get(p.id) ?? []),
       openOffers: Number(s?.open ?? 0),
       pay: paySummary(offersOf.get(p.id) ?? []),
     };
@@ -279,18 +288,14 @@ export async function loadProjectsBoard(query: ProjectsQuery, opts: { all?: bool
 export const EXPORT_MAX_ROWS = 10_000;
 
 
-/**
- * The page's CSV link: the page's own params, unpaged. `type` names the export on that route, so the Engagement filter
- * travels as `ft=yes|no` and `exportQuery` turns it back.
- */
+/** The page's CSV link: the page's own params, unpaged (`type` names the export on that route; the filter rides as `ft`). */
 export function projectsExportHref(params: Record<string, string>): string {
-  const type = parseProjectsQuery(params).type;
-  return `/api/admin/export${toQueryString({ ...params, type: "projects", ft: type === "full_time" ? "yes" : type === "internship" ? "no" : "", page: "" })}`;
+  return `/api/admin/export${toQueryString({ ...params, type: "projects", ft: parseProjectsQuery(params).ft, page: "" })}`;
 }
 
-/** The export's query params (`type` names the export there, so Engagement travels as `ft=yes|no`) as the page's query. */
+/** The export's params as the page's query (its `type=projects` is not a filter). */
 export function exportQuery(params: Record<string, string>): ProjectsQuery {
-  return parseProjectsQuery({ ...params, type: params.ft === "yes" ? "full_time" : params.ft === "no" ? "internship" : "" });
+  return parseProjectsQuery({ ...params, type: "" });
 }
 
 /** The CSV's rows: the loader itself with every filter and the company sort, unpaged. Null when more than EXPORT_MAX_ROWS match. */

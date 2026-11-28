@@ -50,7 +50,8 @@ const ICONS: Record<string, typeof Search> = {
   "/admin/companies": Building2,
   "/admin/colleges": GraduationCap,
   "/admin/projects": Briefcase,
-  "/admin/meetings": CalendarClock,
+  // The Pipeline's Meetings view: its own palette entry (layout.tsx), so typing "meetings" still lands there.
+  "/admin/proposal-tracker?view=meetings": CalendarClock,
   "/admin/master-data": Table2,
   "/admin/orders": ShoppingBag,
   "/admin/intern-invoices": Receipt,

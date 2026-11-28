@@ -14,9 +14,10 @@ import { useToast } from "@/components/app/toast";
 import { buttonClass } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { activeToggle, MODE_LABEL, payLines, projectStatus, restoresToActive } from "@/lib/admin/projects-board-pure";
+import { activeToggle, engagementOf, MODE_LABEL, payLines, projectStatus, restoresToActive } from "@/lib/admin/projects-board-pure";
 import type { BoardCompany, BoardProject } from "@/lib/admin/projects-board";
 import { csrfFetch } from "@/lib/client-fetch";
+import { ProjectOffersTriggers } from "./project-offers-dialog";
 import { formatDate, formatNumber } from "@/lib/format";
 import { TAKEDOWN_REASON_MAX } from "@/lib/projects/takedown";
 import { cn } from "@/lib/utils";
@@ -38,7 +39,7 @@ function CompanySortSelect() {
   );
 }
 
-export function ProjectsBoard({ companies, canWrite, summary }: { companies: BoardCompany[]; canWrite: boolean; summary: string }) {
+export function ProjectsBoard({ companies, canWrite, canSeeOffers, canPdf, summary }: { companies: BoardCompany[]; canWrite: boolean; canSeeOffers: boolean; canPdf: boolean; summary: string }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const allCollapsed = companies.length > 0 && companies.every((c) => collapsed.has(c.employerId));
   const toggle = (id: string) =>
@@ -65,13 +66,13 @@ export function ProjectsBoard({ companies, canWrite, summary }: { companies: Boa
         </div>
       </div>
       {companies.map((c) => (
-        <CompanyGroup key={c.employerId} company={c} open={!collapsed.has(c.employerId)} onToggle={() => toggle(c.employerId)} canWrite={canWrite} />
+        <CompanyGroup key={c.employerId} company={c} open={!collapsed.has(c.employerId)} onToggle={() => toggle(c.employerId)} canWrite={canWrite} canSeeOffers={canSeeOffers} canPdf={canPdf} />
       ))}
     </div>
   );
 }
 
-function CompanyGroup({ company, open, onToggle, canWrite }: { company: BoardCompany; open: boolean; onToggle: () => void; canWrite: boolean }) {
+function CompanyGroup({ company, open, onToggle, canWrite, canSeeOffers, canPdf }: { company: BoardCompany; open: boolean; onToggle: () => void; canWrite: boolean; canSeeOffers: boolean; canPdf: boolean }) {
   const bodyId = useId();
   const ps = company.projects;
   const active = ps.filter((p) => projectStatus(p).key === "active").length;
@@ -108,7 +109,7 @@ function CompanyGroup({ company, open, onToggle, canWrite }: { company: BoardCom
       {open ? (
         <ul id={bodyId} className="border-t border-[color:var(--admin-rule)]">
           {ps.map((p) => (
-            <ProjectRow key={`${p.id}:${p.takenDownAt ?? ""}`} project={p} canWrite={canWrite} />
+            <ProjectRow key={`${p.id}:${p.takenDownAt ?? ""}`} project={p} company={name} canWrite={canWrite} canSeeOffers={canSeeOffers} canPdf={canPdf} />
           ))}
         </ul>
       ) : null}
@@ -116,7 +117,7 @@ function CompanyGroup({ company, open, onToggle, canWrite }: { company: BoardCom
   );
 }
 
-function ProjectRow({ project: p0, canWrite }: { project: BoardProject; canWrite: boolean }) {
+function ProjectRow({ project: p0, company, canWrite, canSeeOffers, canPdf }: { project: BoardProject; company: string; canWrite: boolean; canSeeOffers: boolean; canPdf: boolean }) {
   const detailsId = useId();
   // Optimistic: the switch flips takenDownAt locally while the request runs, and rolls back on failure.
   const [takenDownAt, setTakenDownAt] = useState<string | null>(p0.takenDownAt);
@@ -160,7 +161,8 @@ function ProjectRow({ project: p0, canWrite }: { project: BoardProject; canWrite
         </div>
 
         <div className="min-w-0 text-sm">
-          <p className="text-foreground">{p.fullTimeOffer ? "Full-time" : "Internship"}</p>
+          <p className="text-foreground">{engagementOf(p).engagement}</p>
+          <p className="text-[0.8125rem] text-text-subtle">Full-time after internship: {engagementOf(p).ftAfterInternship}</p>
           {pay.length ? (
             pay.map((line) => (
               <p key={line} className="nums text-[0.8125rem] text-text-subtle">
@@ -173,8 +175,7 @@ function ProjectRow({ project: p0, canWrite }: { project: BoardProject; canWrite
         </div>
 
         <div className="nums text-sm">
-          <p className="text-foreground">{plural(p.offersSent, "offer")}</p>
-          <p className="text-[0.8125rem] text-text-subtle">{plural(p.hires, "hire")}</p>
+          <ProjectOffersTriggers projectId={p.id} projectName={p.name} company={company} offersSent={p.offersSent} hires={p.hires} canOpen={canSeeOffers} canPdf={canPdf} />
         </div>
 
         <div className={cn("flex flex-col items-start gap-3 lg:items-end", asking && "col-span-2 lg:col-span-1")}>

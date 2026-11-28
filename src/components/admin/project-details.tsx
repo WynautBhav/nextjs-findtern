@@ -10,6 +10,7 @@ import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { scopeLabel, type Project } from "@/lib/db/schema";
 import { formatDate } from "@/lib/format";
 import { statusMeta } from "@/app/employer/projects/status";
+import { engagementOf } from "@/lib/admin/projects-board-pure";
 
 /** Read-only view of every field of a project, for the admin's company projects tab. */
 export function ProjectDetailsButton({ project: p }: { project: Project }) {
@@ -36,7 +37,7 @@ export function ProjectDetailsButton({ project: p }: { project: Project }) {
             <DetailRow label="City, state, pincode" value={[p.city, p.state, p.pincode].filter(Boolean).join(", ") || "-"} />
             <DetailRow label="Timezone" value={p.timezone || "-"} />
             <DetailRow label="Duration" value={scopeLabel(p.scopeOfWork)} />
-            <DetailRow label="Full-time offer possible" value={p.fullTimeOffer ? "Yes" : "No"} />
+            <DetailRow label="Full-time after internship" value={engagementOf(p).ftAfterInternship} />
             <DetailRow label="Created" value={formatDate(p.createdAt)} />
             <DetailRow label="Submitted" value={p.submittedAt ? formatDate(p.submittedAt) : "-"} />
             <DetailRow label="Published" value={p.publishedAt ? formatDate(p.publishedAt) : "-"} />

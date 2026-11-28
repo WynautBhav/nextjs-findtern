@@ -24,7 +24,7 @@ import { paymentPromo } from "@/lib/admin/payment-promo";
 import { filterProposals, matchesSearch, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
 import { parseOffer } from "@/lib/offer";
 import { EXPORT_MAX_ROWS, loadProjectsExport } from "@/lib/admin/projects-board";
-import { MODE_LABEL, payLines, projectStatus } from "@/lib/admin/projects-board-pure";
+import { engagementOf, MODE_LABEL, payLines, projectStatus } from "@/lib/admin/projects-board-pure";
 
 import { getSession } from "@/lib/auth";
 
@@ -233,7 +233,8 @@ async function exportProjects(_search: string, params: Record<string, string>, a
     { header: "State", value: (r) => r.state },
     { header: "Preferred locations", value: (r) => r.preferredLocations.join("; ") },
     { header: "Work mode", value: (r) => MODE_LABEL[r.locationType] ?? r.locationType },
-    { header: "Engagement", value: (r) => (r.fullTimeOffer ? "Full-time" : "Internship") },
+    { header: "Engagement", value: (r) => engagementOf(r).engagement },
+    { header: "Full-time after internship", value: (r) => engagementOf(r).ftAfterInternship },
     { header: "Pay", value: (r) => payLines(r.pay).join("; ") || "No offers yet" },
     { header: "Scope of work", value: (r) => r.scope },
     { header: "Status", value: (r) => projectStatus(r).label },

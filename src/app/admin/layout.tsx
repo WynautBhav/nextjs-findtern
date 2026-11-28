@@ -7,7 +7,6 @@ import {
   BarChart3,
   Bell,
   Briefcase,
-  CalendarClock,
   Table2,
   Building2,
   CircleUserRound,
@@ -66,8 +65,8 @@ const NAV: AdminNavGroup[] = [
     title: "Overview",
     items: [
       { href: "/admin/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
-      { href: "/admin/proposal-tracker", label: "Proposal pipeline", icon: <Send /> },
-      { href: "/admin/meetings", label: "Meeting pipeline", icon: <CalendarClock /> },
+      // One item, two views (Proposals | Meetings); /admin/meetings redirects to the Meetings view.
+      { href: "/admin/proposal-tracker", label: "Pipeline", icon: <Send /> },
       { href: "/admin/ai-interviews", label: "AI interviews", icon: <Video /> },
       { href: "/admin/messages", label: "Messages", icon: <MessageSquare /> },
       // A daily queue (stipends due), so it sits with the daily work rather
@@ -135,6 +134,16 @@ const NAV_LABELS: Record<string, string> = {
   ...Object.fromEntries(LEGAL_PAGES.map((l) => [l.key, l.label])),
 };
 
+/**
+ * The Pipeline item's badge: offers waiting on payment plus meetings that need a link, the two "needs you" figures its
+ * Proposals | Meetings toggle shows. A part this admin cannot see (or that failed to load) is null and left out.
+ */
+function pipelineBadge(payment: number | null, noLink: number | null): { count: number | null; note: string } {
+  if (payment === null && noLink === null) return { count: null, note: "" };
+  const parts = [payment === null ? null : `${payment} waiting on payment`, noLink === null ? null : `${noLink} need a meeting link`].filter(Boolean);
+  return { count: (payment ?? 0) + (noLink ?? 0), note: `in all: ${parts.join(" · ")}` };
+}
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session || session.role !== "admin") redirect("/admin/login");
@@ -168,8 +177,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     loadQueueCounts({
       payouts: hasItem("/admin/payouts"),
       candidates: hasItem("/admin/interns"),
-      pipeline: hasItem("/admin/proposal-tracker"),
-      meetings: hasItem("/admin/meetings"),
+      // Each part only for the view this admin may open (the page shows the same two figures on its toggle).
+      pipeline: hasItem("/admin/proposal-tracker") && allows(session.permissions, ["interns:read"]),
+      meetings: hasItem("/admin/proposal-tracker") && allows(session.permissions, requiredPermissions("/admin/meetings")),
       collegePayouts: hasItem("/admin/colleges"),
     }),
     // Interns waiting for Findtern to check their CGPA; a failed read is 0 inside, so no badge rather than a broken rail.
@@ -184,12 +194,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     "/admin/messages": { count: unreadMessages, note: "unread" },
     "/admin/payouts": { count: queue.payouts, note: "due" },
     "/admin/interns": { count: queue.candidates, note: "awaiting a score" },
-    "/admin/proposal-tracker": { count: queue.pipeline, note: "waiting on payment" },
-    "/admin/meetings": { count: queue.meetingsNoLink, note: "need a meeting link" },
+    "/admin/proposal-tracker": pipelineBadge(queue.pipeline, queue.meetingsNoLink),
     "/admin/colleges": { count: queue.collegePayouts, note: "withdrawals to pay" },
     "/admin/cgpa-verifications": { count: cgpaPending, note: "to verify" },
     "/admin/meeting-reviews": { count: meetingReviewsPending, note: "to review" },
   };
+  // The palette lists every sidebar item, plus the Pipeline's Meetings view by name (it has no sidebar item of its own).
+  const paletteItems = groups.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, group: g.title ?? "" })));
+  if (hasItem("/admin/proposal-tracker") && allows(session.permissions, requiredPermissions("/admin/meetings"))) {
+    const at = paletteItems.findIndex((i) => i.href === "/admin/proposal-tracker");
+    paletteItems.splice(at + 1, 0, { href: "/admin/proposal-tracker?view=meetings", label: "Meetings", group: "Overview" });
+  }
   const withBadges = groups.map((g) => ({
     ...g,
     items: g.items.map((i) => {
@@ -204,7 +219,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       groups={withBadges}
       account={{ name: adminName ?? session.email.split("@")[0], email: session.email, subtitle: roleName(session.permissions) }}
       menu={[{ href: "/admin/account", label: "Your account", icon: <CircleUserRound /> }]}
-      topActions={<CommandPalette items={groups.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, group: g.title ?? "" })))} />}
+      topActions={<CommandPalette items={paletteItems} />}
       signOutTo="/admin/login"
       initialCollapsed={cookieStore.get(RAIL_COOKIE)?.value === "1"}
       initialTheme={parseAdminTheme(cookieStore.get(ADMIN_THEME_COOKIE)?.value)}

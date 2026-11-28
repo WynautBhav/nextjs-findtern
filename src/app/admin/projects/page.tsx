@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth";
-import { canWrite } from "@/lib/admin/permissions";
+import { allows, canWrite, requiredPermissions } from "@/lib/admin/permissions";
 import { flattenParams, toQueryString } from "@/lib/admin/params";
 import { COMPANIES_PER_PAGE, loadProjectsBoard, MODE_FILTERS, parseProjectsQuery, projectsExportHref, STATUS_FILTERS, type ProjectsBoard as Board } from "@/lib/admin/projects-board";
 import { formatNumber } from "@/lib/format";
@@ -24,6 +24,9 @@ export default async function AdminProjectsPage({
   const session = await getSession();
   // The page path has no write rule of its own; the takedown / restore routes need companies:write.
   const mayWrite = canWrite(session?.permissions, "/api/admin/projects");
+  // The offers pop-up and the proposal PDF list interns' contacts and pay: the same rules the proxy applies to their routes.
+  const canSeeOffers = allows(session?.permissions, requiredPermissions("/api/admin/project-offers/x"));
+  const canPdf = allows(session?.permissions, requiredPermissions("/api/admin/proposals/x/pdf"));
 
   let board: Board | null = null;
   try {
@@ -47,16 +50,16 @@ export default async function AdminProjectsPage({
   }
 
   const v = board.views;
-  const viewHref = (patch: Record<string, string>) => `/admin/projects${toQueryString({ ...params, status: "", type: "", page: "", ...patch })}`;
+  const viewHref = (patch: Record<string, string>) => `/admin/projects${toQueryString({ ...params, status: "", type: "", ft: "", page: "", ...patch })}`;
   const views: AdminTabItem[] = [
     { key: "all", label: "All projects", count: v.all, href: viewHref({}) },
     { key: "active", label: "Active", count: v.active, href: viewHref({ status: "active" }) },
     { key: "deactivated", label: "Deactivated", count: v.deactivated, href: viewHref({ status: "deactivated" }) },
-    { key: "full_time", label: "Full-time", count: v.full_time, href: viewHref({ type: "full_time" }) },
+    { key: "full_time", label: "Full-time after internship", count: v.full_time, href: viewHref({ ft: "yes" }) },
   ];
   const activeView =
-    !query.type && !query.status ? "all" : !query.type && (query.status === "active" || query.status === "deactivated") ? query.status : query.type === "full_time" && !query.status ? "full_time" : "";
-  const filtered = Boolean(query.q || query.status || query.type || query.mode || query.city);
+    !query.ft && !query.status ? "all" : !query.ft && (query.status === "active" || query.status === "deactivated") ? query.status : query.ft === "yes" && !query.status ? "full_time" : "";
+  const filtered = Boolean(query.q || query.status || query.ft || query.mode || query.city);
   const shownProjects = board.companies.reduce((n, c) => n + c.projects.length, 0);
 
   return (
@@ -70,7 +73,8 @@ export default async function AdminProjectsPage({
         exportHref={exportHref}
         filters={[
           { key: "status", label: "Status", options: [...STATUS_FILTERS] },
-          { key: "type", label: "Engagement", options: [{ value: "full_time", label: "Full-time" }, { value: "internship", label: "Internship" }] },
+          // Every project is an internship; this is the employer's answer to "Full-time role after the internship".
+          { key: "ft", label: "Full-time after internship", options: [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }], allLabel: "Any" },
           { key: "mode", label: "Work mode", options: [...MODE_FILTERS] },
           { key: "city", label: "City", options: board.cities.map((c) => ({ value: c, label: c })) },
         ]}
@@ -90,6 +94,8 @@ export default async function AdminProjectsPage({
             key={`${board.page}:${toQueryString(params)}`}
             companies={board.companies}
             canWrite={mayWrite}
+            canSeeOffers={canSeeOffers}
+            canPdf={canPdf}
             summary={`${formatNumber(board.totalProjects)} ${board.totalProjects === 1 ? "project" : "projects"} from ${formatNumber(board.totalCompanies)} ${board.totalCompanies === 1 ? "company" : "companies"}${board.pages > 1 ? `, ${formatNumber(shownProjects)} on this page` : ""}.`}
           />
           {board.pages > 1 ? (

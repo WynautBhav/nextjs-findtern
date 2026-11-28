@@ -71,7 +71,7 @@ function pipelineNeedingAction(): Promise<number | null> {
   });
 }
 
-/** Upcoming employer interviews with no meeting link: the rows /admin/meetings?nolink=1 lists (meetingsNoLinkWhere). */
+/** Upcoming employer interviews with no meeting link: the rows /admin/proposal-tracker?view=meetings&nolink=1 lists (meetingsNoLinkWhere). */
 export function meetingsNoLink(): Promise<number | null> {
   return settleCount(async () => {
     const res = await getDb().execute<{ value: number }>(sql`SELECT count(*)::int AS value FROM ${schema.interviews} WHERE ${meetingsNoLinkWhere()}`);

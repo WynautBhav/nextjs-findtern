@@ -19,11 +19,20 @@ import { ProposalTrackerView, TRACKER_TABS, type TrackerTab } from "@/components
 import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { isAiInterview } from "@/lib/admin/interview-notes";
 import { ButtonAnchor } from "@/components/ui/button";
+import { MeetingsPipeline } from "@/components/admin/meetings/meetings-pipeline";
+import { PipelineToggle, type PipelineSegment } from "@/components/admin/pipeline-toggle";
+import { allows, requiredPermissions, type Permission } from "@/lib/admin/permissions";
+import { loadQueueCounts } from "@/lib/admin/queue-counts";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
+
+const PROPOSALS_VIEW: Permission[] = ["interns:read"];
 
 /**
- * Proposal pipeline: every sent proposal in one bucket (KPI cards that filter the records table), plus the by-candidate,
+ * Pipeline (Proposals | Meetings, one toggle apart; ?view=meetings is the Meetings view, /admin/meetings redirects here).
+ * Proposals: every sent proposal in one bucket (KPI cards that filter the records table), plus the by-candidate,
  * by-company and expired-reason views, all filtered by the same URL (date range, exact company, exact candidate,
- * timezone), so the figures and the tables never disagree. Interviews moved to the Meeting pipeline (/admin/meetings).
+ * timezone), so the figures and the tables never disagree.
  */
 
 async function load() {
@@ -134,10 +143,36 @@ export default async function AdminProposalTrackerPage({
 }) {
   kickProposalExpiry(); // queued after the response; throttled to one sweep per 10 minutes
   const params = flattenParams(await searchParams);
-  // Old links: the Hired tab is now the Hired card of the main view; Interviews moved to the Meeting pipeline.
+  // Old links: the Hired tab is now the Hired card of the main view; the Interviews tab is the Meetings view.
   if (params.tab === "hired") {
     params.tab = "proposals";
     params.status = "hired";
+  }
+  if (params.tab === "interviews") redirect("/admin/proposal-tracker?view=meetings");
+
+  // Two views, each behind its own permission: Proposals needs interns:read, Meetings what /admin/meetings needs (the
+  // page path itself admits either, see permissions.ts). Without the asked-for view, the other one opens.
+  const session = await getSession();
+  const canProposals = allows(session?.permissions, PROPOSALS_VIEW);
+  const canMeetings = allows(session?.permissions, requiredPermissions("/admin/meetings"));
+  const view: "proposals" | "meetings" = (params.view === "meetings" && canMeetings) || !canProposals ? "meetings" : "proposals";
+  // The same figures as the sidebar's one Pipeline badge (queue-counts.ts).
+  const queue = await loadQueueCounts({ payouts: false, candidates: false, pipeline: canProposals, meetings: canMeetings });
+  const segments: PipelineSegment[] = [
+    ...(canProposals ? [{ key: "proposals" as const, label: "Proposals", href: "/admin/proposal-tracker", count: queue.pipeline, note: "waiting on payment" }] : []),
+    // Meetings has no date range, so nothing of the Proposals view's URL is carried over (and back).
+    ...(canMeetings ? [{ key: "meetings" as const, label: "Meetings", href: "/admin/proposal-tracker?view=meetings", count: queue.meetingsNoLink, note: "need a meeting link" }] : []),
+  ];
+  const toggle = <PipelineToggle active={view} segments={segments} />;
+
+  if (view === "meetings") {
+    return (
+      <div className="space-y-6">
+        <AdminPageHeader title="Pipeline" />
+        {toggle}
+        <MeetingsPipeline params={params} />
+      </div>
+    );
   }
   const tab: TrackerTab = (TRACKER_TABS as readonly string[]).includes(params.tab ?? "") ? (params.tab as TrackerTab) : "proposals";
   const filters: TrackerFilters = {
@@ -150,7 +185,7 @@ export default async function AdminProposalTrackerPage({
 
   const header = (
     <AdminPageHeader
-      title="Proposal pipeline"
+      title="Pipeline"
       action={
         tab === "expired" || tab === "candidates" || tab === "companies" ? (
           <ButtonAnchor
@@ -247,6 +282,7 @@ export default async function AdminProposalTrackerPage({
   return (
     <div className="space-y-6">
       {header}
+      {toggle}
 
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <DateRangeForm params={params} fromLabel={tab === "expired" ? "Expired from" : "Sent from"} toLabel={tab === "expired" ? "Expired to" : "Sent to"} />
