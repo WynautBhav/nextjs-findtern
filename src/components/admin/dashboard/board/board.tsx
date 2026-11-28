@@ -8,6 +8,7 @@ import { ADMIN_SURFACE } from "@/components/admin/surface";
 import {
   BOARD_VIEWS,
   employerMetrics,
+  SIZE_UNKNOWN,
   pct,
   studentMetrics,
   trackCounts,
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 
 import { Metro, type Station } from "./metro";
 import { PeopleDrawer, type DrawerRow, type DrawerSpec } from "./people-drawer";
+import { BoardMotion, CountUp, DotField, FacePile, initials, Versus, type Face } from "./visuals";
 
 
 const fmt = (n: number) => n.toLocaleString("en-IN");
@@ -33,7 +35,43 @@ const REPLY_TONE: Record<BoardOffer["reply"], NonNullable<DrawerRow["chip"]>["to
 const STAGE_LABEL: Record<BoardMeeting["stage"], string> = { sent: "Waiting for the student", accepted: "Accepted", completed: "Completed", expired: "Expired", withdrawn: "Withdrawn" };
 const FTE_LABEL: Record<string, string> = { none: "FTE: none", applied: "FTE requested", approved: "FTE approved" };
 const dateOf = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }) : "—");
-const lastSeen = (s: BoardStudent) => (s.activityHidden ? "Hidden" : s.lastSeenAt ? new Date(s.lastSeenAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "Never");
+/** "3 h ago", "Online now", "Never", "Hidden": the student's last seen, worded for a list. */
+function seenOf(s: BoardStudent, now: number): string {
+  if (s.activityHidden) return "Hidden";
+  if (s.online) return "Online now";
+  if (!s.lastSeenAt) return "Never";
+  const mins = Math.max(0, Math.round((now - new Date(s.lastSeenAt).getTime()) / 60000));
+  if (mins < 60) return `${mins} min ago`;
+  const h = Math.round(mins / 60);
+  if (h < 24) return `${h} h ago`;
+  const d = Math.round(h / 24);
+  return d < 60 ? `${d} ${d === 1 ? "day" : "days"} ago` : dateOf(s.lastSeenAt);
+}
+
+/** The student's latest step, in one line: the furthest point they reached and with whom. */
+function whatOf(s: BoardStudent, offers: BoardOffer[], meets: BoardMeeting[]): string {
+  const hire = offers.find((o) => o.hired);
+  if (hire) return `Hired by ${hire.employer} · ${hire.track === "full_time" ? "full-time" : "internship"}`;
+  const accepted = offers.find((o) => o.reply === "accepted");
+  if (accepted) return `Accepted ${accepted.employer}'s offer · waiting for the employer's payment`;
+  const pending = offers.find((o) => o.reply === "pending");
+  if (pending) return `Offer from ${pending.employer} · no reply yet`;
+  const meetSent = meets.find((m) => m.stage === "sent");
+  if (meetSent) return `Meeting request from ${meetSent.employer} · no reply yet`;
+  const meetBooked = meets.find((m) => m.stage === "accepted");
+  if (meetBooked) return `Meeting with ${meetBooked.employer} booked${meetBooked.startsAt ? ` for ${dateOf(meetBooked.startsAt)}` : ""}`;
+  const last = offers[0];
+  if (last) return `Offer from ${last.employer} ${REPLY_LABEL[last.reply].toLowerCase()}`;
+  if (s.aiStatus === "completed") return `AI interviewed${s.score != null ? ` · score ${s.score.toFixed(1)}` : ""} · no offer yet`;
+  if (s.pendingPayment) return "Applied for the AI interview · payment pending";
+  if (s.aiStatus === "scheduled") return "AI interview scheduled";
+  if (s.aiStatus === "sent") return "AI interview link sent · not taken yet";
+  if (s.aiStatus === "expired") return "AI interview link expired";
+  if (s.aiStatus === "applied") return "Applied for the AI interview · waiting for a link";
+  if (s.profileComplete) return "Profile complete · AI interview not applied";
+  return `Signed up · profile ${s.profilePct}% done`;
+}
+
 
 export function DashboardBoardView({
   data,
@@ -71,10 +109,13 @@ export function DashboardBoardView({
   const offerIx = useMemo(() => new Map(data.offers.map((o) => [o.id, o])), [data.offers]);
   const meetIx = useMemo(() => new Map(data.meetings.map((m) => [m.id, m])), [data.meetings]);
   const empIx = useMemo(() => new Map(data.employers.map((e) => [e.id, e])), [data.employers]);
+  const offersBy = useMemo(() => Map.groupBy(data.offers, (o) => o.internId), [data.offers]);
+  const meetsBy = useMemo(() => Map.groupBy(data.meetings, (x) => x.internId), [data.meetings]);
 
   /** A metric's list as drawer rows, from the same ids its count is the length of. */
   const open = useCallback(
     (title: string, list: MetricList, waiting?: MetricList) => {
+      const now = Date.now();
       const studentRow = (s: BoardStudent, id: string, extra: Partial<DrawerRow> = {}, csv: Record<string, string | number | null> = {}): DrawerRow => ({
         id,
         targetId: s.id,
@@ -83,11 +124,13 @@ export function DashboardBoardView({
         email: s.email,
         phone: s.phone,
         href: links.interns ? `/admin/interns/${encodeURIComponent(s.id)}` : null,
+        what: whatOf(s, offersBy.get(s.id) ?? [], meetsBy.get(s.id) ?? []),
+        seen: seenOf(s, now),
         csv: {
-          Name: s.name, Email: s.email, Phone: s.phone, College: s.college ?? "Individual", Year: s.year, Branch: s.branch,
+          Name: s.name, "What happened": whatOf(s, offersBy.get(s.id) ?? [], meetsBy.get(s.id) ?? []), "Last seen": seenOf(s, now), Email: s.email, Phone: s.phone, College: s.college ?? "Individual", Year: s.year, Branch: s.branch,
           "Tech / non-tech": s.track === "tech" ? "Tech" : s.track === "non_tech" ? "Non-tech" : "Not interviewed yet",
           "Profile %": s.profilePct, "AI interview": AI_LABEL[s.aiStatus] ?? s.aiStatus, "Findtern Score": s.score,
-          "Open to work": s.openToWork ? "Yes" : "No", "Last seen": lastSeen(s), ...csv,
+          "Open to work": s.openToWork ? "Yes" : "No", ...csv,
         },
         ...extra,
       });
@@ -114,13 +157,22 @@ export function DashboardBoardView({
         rows = list.ids.flatMap((id) => {
           const e = empIx.get(id);
           if (!e) return [];
+          const what = (() => {
+              const mine = data.offers.filter((o) => o.employerId === e.id);
+              const hired = mine.filter((o) => o.hired).length;
+              if (hired) return `Hired ${hired} · ${mine.length} ${mine.length === 1 ? "offer" : "offers"} sent`;
+              if (mine.length) return `${mine.length} ${mine.length === 1 ? "offer" : "offers"} sent · no hire yet`;
+              if (e.inDriveNow) return "In a campus drive now · no offer yet";
+              return e.onboarded ? "Onboarded · no offer yet" : "Signed up · onboarding not finished";
+            })();
           return [{
             id: e.id, targetId: e.id, name: e.company,
+            what,
             sub: [e.contact, e.city, e.country].filter(Boolean).join(" · ") || "—",
             chip: e.fte !== "none" ? { label: FTE_LABEL[e.fte] ?? e.fte, tone: e.fte === "applied" ? "wait" : "good" } : undefined,
             email: e.email, phone: e.phone, href: links.companies ? `/admin/companies/${encodeURIComponent(e.id)}` : null,
             csv: {
-              Company: e.company, Contact: e.contact, Email: e.email, Phone: e.phone, City: e.city, Country: e.country, Size: e.size ?? "Not given",
+              Company: e.company, "What happened": what, Contact: e.contact, Email: e.email, Phone: e.phone, City: e.city, Country: e.country, Size: e.size ?? "Not given",
               Onboarded: e.onboarded ? "Yes" : "No", "Came via": e.viaDrive ? "College drive" : "Direct", "In a drive now": e.inDriveNow ? "Yes" : "No",
               FTE: FTE_LABEL[e.fte] ?? e.fte, "Signed up": dateOf(e.createdAt),
             },
@@ -132,7 +184,7 @@ export function DashboardBoardView({
       const sub = waitingIds ? `${fmt(rows.length)} reached, ${fmt(waitingIds.size)} waiting here` : `${fmt(rows.length)} ${noun}`;
       setDrawer({ title, sub, kind, rows, waitingIds, filename: `findtern-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.csv` });
     },
-    [ix, offerIx, meetIx, empIx, links],
+    [ix, offerIx, meetIx, empIx, offersBy, meetsBy, links, data.offers],
   );
 
   const asOf = new Date(data.generatedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
@@ -176,6 +228,7 @@ export function DashboardBoardView({
         {view === "colleges" ? <CollegesView colleges={data.colleges} open={open} links={links} /> : null}
       </div>
 
+      <BoardMotion />
       <PeopleDrawer spec={drawer} onClose={() => setDrawer(null)} canNudge={canNudge} onToast={onToast} />
       {/* Always mounted, so a screen reader hears the text when it arrives. */}
       <div role="status" aria-live="polite" className={cn(toast ? "fixed bottom-4 right-4 z-[60] max-w-sm rounded-xl px-4 py-3 text-sm text-white shadow-lg" : "sr-only", toast?.bad ? "bg-[#9b1c1c]" : "bg-brand-800")}>
@@ -204,57 +257,6 @@ function Card({ title, sub, action, className, children }: { title: string; sub?
   );
 }
 
-/** A figure that opens its list. `tone="wait"` marks a number that needs someone to act. */
-function Figure({ label, value, onOpen, tone, hint }: { label: string; value: number; onOpen: () => void; tone?: "wait"; hint?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="group min-w-0 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-    >
-      <span className="block text-sm text-text-subtle">{label}</span>
-      <span className={cn("mt-0.5 block text-[1.75rem] font-semibold leading-tight tabular-nums underline-offset-4 group-hover:underline", tone === "wait" && value > 0 ? "text-accent-700" : "text-foreground")}>
-        {fmt(value)}
-      </span>
-      {hint ? <span className="block text-xs text-text-subtle">{hint}</span> : null}
-    </button>
-  );
-}
-
-type Part = { key: string; label: string; list: MetricList; title: string; color: string };
-
-/** Two or three counts that split one whole, as one bar with a clickable legend. */
-function Split({ label, parts, open, totalLabel = "in all" }: { label: string; parts: Part[]; open: Open; totalLabel?: string }) {
-  const total = parts.reduce((s, p) => s + p.list.ids.length, 0);
-  return (
-    <div className="min-w-0">
-      <div className="mb-1.5 flex items-baseline justify-between gap-3">
-        <span className="text-sm font-medium text-foreground">{label}</span>
-        <span className="text-xs tabular-nums text-text-subtle">{fmt(total)} {totalLabel}</span>
-      </div>
-      <div className="flex h-2.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
-        {parts.map((p) => (total > 0 && p.list.ids.length > 0 ? <span key={p.key} style={{ width: `${(p.list.ids.length / total) * 100}%`, background: p.color }} className="h-full border-r-2 border-[color:var(--admin-panel)] last:border-r-0" /> : null))}
-      </div>
-      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-        {parts.map((p) => (
-          <li key={p.key}>
-            <button
-              type="button"
-              onClick={() => open(p.title, p.list)}
-              className="inline-flex items-center gap-1.5 rounded text-sm text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              <span className="size-2 rounded-full" style={{ background: p.color }} aria-hidden />
-              {p.label}
-              <span className="font-semibold tabular-nums">{fmt(p.list.ids.length)}</span>
-              {total > 0 ? <span className="text-xs tabular-nums text-text-subtle">{pct(p.list.ids.length, total)}%</span> : null}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 const C_MAIN = "var(--color-brand-700)";
 const C_SOFT = "var(--color-brand-300)";
 const C_WAIT = "var(--color-accent-500)";
@@ -268,15 +270,104 @@ const minus = (a: MetricList, b: MetricList): MetricList => {
 
 // ---------- Students ----------
 
+/** The deep green hero every tab opens on: the finding in large type, the controls, then the line. */
+function NightPanel({ headline, side, note, children }: { headline: React.ReactNode; side?: React.ReactNode; note?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="relative overflow-hidden rounded-[var(--radius-admin-card)] bg-[color:var(--admin-deep)] p-5 text-[#f2faf6] md:p-8">
+      {/* A faint track map behind the line: the network this line belongs to. Drawn, quiet, no glow. */}
+      <svg aria-hidden className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.07]" preserveAspectRatio="none" viewBox="0 0 100 100">
+        <path d="M-5 78 C 20 70, 30 30, 55 34 S 90 20, 105 8" fill="none" stroke="#fff" strokeWidth="0.6" />
+        <path d="M-5 96 C 25 92, 45 60, 70 64 S 95 50, 105 44" fill="none" stroke="#fff" strokeWidth="0.4" strokeDasharray="1.5 1.5" />
+      </svg>
+      {/* The controls keep one place whatever the headline says, so switching a filter never moves them. */}
+      {side ? <div className="relative mb-5 flex flex-wrap items-center justify-between gap-2">{side}</div> : null}
+      <h2 className="relative max-w-3xl text-balance text-2xl font-medium leading-[1.2] tracking-[-0.015em] md:min-h-[4.8rem] md:text-[2rem]">{headline}</h2>
+      {note ? <div className="relative mt-2 text-sm text-[#a9cbbd]">{note}</div> : null}
+      <div className="relative mt-8 overflow-x-auto pb-2">{children}</div>
+    </section>
+  );
+}
+
+function Pills<K extends string>({ value, options, onChange, label }: { value: K; options: readonly (readonly [K, string, number])[]; onChange: (k: K) => void; label: string }) {
+  return (
+    <div role="group" aria-label={label} className="inline-flex rounded-full bg-white/10 p-1">
+      {options.map(([k, l, c]) => (
+        <button
+          key={k}
+          type="button"
+          aria-pressed={value === k}
+          onClick={() => onChange(k)}
+          className={cn(
+            "h-8 rounded-full px-3.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white touch:h-11",
+            value === k ? "bg-[#f2faf6] font-medium text-[#0a3a2c]" : "text-[#cfe6db] hover:text-white",
+          )}
+        >
+          {l} <span className="tabular-nums opacity-70">{fmt(c)}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LiveChip({ count, onOpen }: { count: number; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="inline-flex h-9 items-center gap-2 rounded-full border border-white/15 px-3.5 text-sm text-[#e3f3eb] transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white touch:h-11"
+    >
+      <span className="relative flex size-2">
+        {count > 0 ? <span className="absolute inline-flex size-full rounded-full bg-[#7be0b0] opacity-60 motion-safe:animate-ping" /> : null}
+        <span className={cn("relative inline-flex size-2 rounded-full", count > 0 ? "bg-[#7be0b0]" : "bg-white/30")} />
+      </span>
+      <span className="font-semibold tabular-nums">{fmt(count)}</span> online now
+    </button>
+  );
+}
+
+/** A big figure with the faces behind it. */
+function PeopleFigure({ label, list, faces, tone, onOpen, hint }: { label: string; list: MetricList; faces: Face[]; tone?: "wait"; onOpen: () => void; hint?: string }) {
+  const v = list.ids.length;
+  return (
+    <div className="min-w-0">
+      <button type="button" onClick={onOpen} className="group block rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+        <span className="block text-sm text-text-subtle">{label}</span>
+        <CountUp value={v} className={cn("mt-0.5 block text-[2.25rem] font-semibold leading-none tracking-[-0.02em] underline-offset-4 group-hover:underline", tone === "wait" && v > 0 ? "text-accent-700" : "text-foreground")} />
+      </button>
+      <div className="mt-3 min-h-8">
+        {v > 0 ? <FacePile faces={faces} total={v} max={4} onOpen={onOpen} label={`See all ${fmt(v)}`} /> : <span className="text-xs text-text-subtle">{hint ?? "No one right now"}</span>}
+      </div>
+    </div>
+  );
+}
+
 function StudentsView({ data, track, setTrack, open, links }: { data: DashboardBoard; track: TrackFilter; setTrack: (t: TrackFilter) => void; open: Open; links: BoardLinks }) {
   const m = useMemo(() => studentMetrics(data, track), [data, track]);
   const counts = useMemo(() => trackCounts(data.students), [data.students]);
+  const nameOf = useMemo(() => new Map(data.students.map((s) => [s.id, s.name])), [data.students]);
+  const internOf = useMemo(() => new Map([...data.offers.map((o) => [o.id, o.internId] as const), ...data.meetings.map((x) => [x.id, x.internId] as const)]), [data.offers, data.meetings]);
+  const [profileView, setProfileView] = useState<"work" | "college">("work");
   const n = (l: MetricList) => l.ids.length;
+  /** Faces for a list: the students behind it, once each. */
+  const faces = (l: MetricList, max = 8): Face[] => {
+    const seen = new Set<string>();
+    const out: Face[] = [];
+    for (const id of l.ids) {
+      const sid = l.kind === "students" ? id : internOf.get(id);
+      if (!sid || seen.has(sid)) continue;
+      seen.add(sid);
+      out.push({ id: sid, name: nameOf.get(sid) ?? "Student" });
+      if (out.length >= max) break;
+    }
+    return out;
+  };
   const tag = track === "all" ? "" : track === "tech" ? " (tech)" : " (non-tech)";
   const st = (key: string, label: string, list: MetricList, next: MetricList | null, extra: Partial<Station> = {}): Station => {
     const waiting = next ? minus(list, next) : null;
     return {
       key, label, reached: n(list), waiting: waiting ? n(waiting) : undefined,
+      faces: waiting ? faces(waiting, 4) : undefined,
+      onOpenWaiting: waiting ? () => open(label + tag, list, waiting) : undefined,
       onOpen: () => open(label + tag, list, waiting ?? undefined),
       ...extra,
     };
@@ -304,156 +395,181 @@ function StudentsView({ data, track, setTrack, open, links }: { data: DashboardB
 
   return (
     <div className="space-y-[var(--admin-gap)]">
-      <section className={cn(ADMIN_SURFACE, "p-[var(--admin-pad-panel)] md:p-6")}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <h2 className="max-w-3xl text-pretty text-lg font-medium leading-snug text-foreground md:text-xl">
+      <NightPanel
+        headline={
+          <>
             {stuck ? (
               <>
-                {fmt(stuck.waiting ?? 0)} of {fmt(stuck.reached)} at <span className="text-accent-700">{stuck.label}</span> have not moved on yet.{" "}
+                <span className="text-accent-300">{fmt(stuck.waiting ?? 0)}</span> of {fmt(stuck.reached)} are stuck at {stuck.label}.{" "}
               </>
             ) : null}
-            {fmt(n(m.hired))} of {fmt(n(m.signedUp))} signups are hired.
-          </h2>
-          <div role="group" aria-label="Tech or non-tech students" className="inline-flex rounded-full border border-ink-200 p-0.5">
-            {(
-              [
-                ["all", "All", counts.all],
-                ["tech", "Tech", counts.tech],
-                ["non_tech", "Non-tech", counts.non_tech],
-              ] as const
-            ).map(([k, l, c]) => (
-              <button
-                key={k}
-                type="button"
-                aria-pressed={track === k}
-                onClick={() => setTrack(k)}
-                className={cn(
-                  "h-8 rounded-full px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:h-11",
-                  track === k ? "bg-brand-700 text-white" : "text-text-subtle hover:text-foreground",
-                )}
-              >
-                {l} <span className="tabular-nums opacity-80">{fmt(c)}</span>
+            {n(m.signedUp) === 0 ? (
+              <span className="text-[#a9cbbd]">{track === "all" ? "No students yet." : `No ${track === "tech" ? "tech" : "non-tech"} students yet.`}</span>
+            ) : (
+              <span className="text-[#a9cbbd]">
+                {fmt(n(m.hired))} of {fmt(n(m.signedUp))} signups are hired.
+              </span>
+            )}
+          </>
+        }
+        side={
+          <>
+            <LiveChip count={n(m.onlineNow)} onOpen={() => open("Online now" + tag, m.onlineNow)} />
+            <Pills
+              label="Tech or non-tech students"
+              value={track}
+              onChange={setTrack}
+              options={[["all", "All", counts.all], ["tech", "Tech", counts.tech], ["non_tech", "Non-tech", counts.non_tech]] as const}
+            />
+          </>
+        }
+        note={
+          track === "all"
+            ? `Tech or non-tech is known after the AI interview: a coding score means tech. ${fmt(counts.unknown)} not interviewed yet.`
+            : `Only ${track === "tech" ? "tech" : "non-tech"} students: their AI interview ${track === "tech" ? "had" : "had no"} coding score.`
+        }
+      >
+        {n(m.signedUp) === 0 ? (
+          <div className="grid min-h-48 place-items-center rounded-2xl border border-dashed border-white/15 px-6 py-10 text-center">
+            <div>
+              <p className="text-lg font-medium">{track === "all" ? "No students on the line yet" : `No ${track === "tech" ? "tech" : "non-tech"} students on the line yet`}</p>
+              <p className="mt-1 text-sm text-[#a9cbbd]">They appear here once an AI interview is scored {track === "non_tech" ? "without" : "with"} a coding round.</p>
+              <button type="button" onClick={() => setTrack("all")} className="mt-4 inline-flex h-9 items-center rounded-full bg-[#f2faf6] px-4 text-sm font-medium text-[#0a3a2c] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white touch:h-11">
+                Show all students
               </button>
-            ))}
+            </div>
           </div>
-        </div>
-        <p className="mt-1 text-xs text-text-subtle">
-          {track === "all"
-            ? `Tech or non-tech is known after the AI interview (a coding score means tech). ${fmt(counts.unknown)} not interviewed yet.`
-            : `Only ${track === "tech" ? "tech" : "non-tech"} students: those whose AI interview ${track === "tech" ? "had" : "had no"} coding score.`}
-        </p>
-        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-text-subtle" aria-hidden>
-          <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-4 rounded-full bg-brand-700" />On the line</span>
-          <span className="inline-flex items-center gap-1.5"><span className="size-[5px] rounded-full bg-accent-500" />10 waiting</span>
-          <span>Amber arc: share still waiting</span>
-        </div>
-        <div className="mt-6 overflow-x-auto pb-1">
-          <Metro stations={stations} className="md:min-w-[46rem]" />
-        </div>
-      </section>
+        ) : (
+          <Metro stations={stations} theme="night" className="md:min-w-[48rem]" />
+        )}
+      </NightPanel>
 
       <div className="grid gap-[var(--admin-gap)] lg:grid-cols-12">
         <Card
           title="Waiting on students"
-          className="lg:col-span-4"
+          sub="Each face is someone you can nudge today"
+          className="lg:col-span-5"
+        >
+          <div className="grid grid-cols-2 gap-x-4 gap-y-6">
+            <PeopleFigure label="Offers, no reply" list={m.offersAwaiting} faces={faces(m.offersAwaiting)} tone="wait" onOpen={() => open("Offers awaiting reply" + tag, m.offersAwaiting)} />
+            <PeopleFigure label="Meetings, no reply" list={m.meetingsAwaiting} faces={faces(m.meetingsAwaiting)} tone="wait" onOpen={() => open("Meetings awaiting reply" + tag, m.meetingsAwaiting)} />
+            <PeopleFigure label="CGPA to check" list={m.cgpaPending} faces={faces(m.cgpaPending)} tone="wait" onOpen={() => open("Awaiting CGPA check" + tag, m.cgpaPending)} hint="Every CGPA is checked" />
+            <PeopleFigure label="Offers expired" list={m.offersExpired} faces={faces(m.offersExpired)} onOpen={() => open("Offers expired" + tag, m.offersExpired)} hint="None lapsed unanswered" />
+          </div>
+          {links.cgpa ? (
+            <Link href="/admin/cgpa-verifications" className="mt-5 inline-block text-sm text-primary underline-offset-4 hover:underline">
+              Review CGPA checks
+            </Link>
+          ) : null}
+        </Card>
+
+        <Card title="Offers and meetings" sub="How students answered, every offer so far" className="lg:col-span-7">
+          <div className="space-y-6">
+            <Versus
+              title="Internship proposals"
+              note={`${fmt(n(m.internshipAccepted) + n(m.internshipRejected))} decided`}
+              left={{ label: "Accepted", value: n(m.internshipAccepted), onOpen: () => open("Internship proposals accepted" + tag, m.internshipAccepted) }}
+              right={{ label: "Rejected", value: n(m.internshipRejected), onOpen: () => open("Internship proposals rejected" + tag, m.internshipRejected) }}
+            />
+            <Versus
+              title="Full-time offers"
+              note={`${fmt(n(m.fullTimeAccepted) + n(m.fullTimeRejected))} decided`}
+              left={{ label: "Accepted", value: n(m.fullTimeAccepted), onOpen: () => open("Full-time offers accepted" + tag, m.fullTimeAccepted) }}
+              right={{ label: "Rejected", value: n(m.fullTimeRejected), onOpen: () => open("Full-time offers rejected" + tag, m.fullTimeRejected) }}
+            />
+            <Versus
+              title="Meetings"
+              note={`${fmt(n(m.meetsCompleted) + n(m.meetsExpired))} finished`}
+              left={{ label: "Completed", value: n(m.meetsCompleted), onOpen: () => open("Meetings completed" + tag, m.meetsCompleted) }}
+              right={{ label: "Expired", value: n(m.meetsExpired), onOpen: () => open("Meetings expired" + tag, m.meetsExpired), color: C_WAIT }}
+            />
+          </div>
+        </Card>
+
+        <Card
+          title="Every student, one dot each"
+          sub={profileView === "work" ? "Who employers can find" : "Joined through a college, or on their own"}
+          className="lg:col-span-7"
           action={
-            links.cgpa ? (
-              <Link href="/admin/cgpa-verifications" className="text-sm text-primary underline-offset-4 hover:underline">
-                CGPA checks
-              </Link>
-            ) : null
+            <div role="group" aria-label="Colour the dots by" className="inline-flex rounded-full bg-[color:var(--admin-panel-2)] p-0.5">
+              {(
+                [
+                  ["work", "Open to work"],
+                  ["college", "College"],
+                ] as const
+              ).map(([k, l]) => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={profileView === k}
+                  onClick={() => setProfileView(k)}
+                  className={cn("h-8 rounded-full px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:h-11", profileView === k ? "bg-[color:var(--admin-panel)] font-medium text-foreground shadow-sm" : "text-text-subtle hover:text-foreground")}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
           }
         >
-          <div className="grid grid-cols-2 gap-4">
-            <Figure label="Offers, no reply" value={n(m.offersAwaiting)} tone="wait" onOpen={() => open("Offers awaiting reply" + tag, m.offersAwaiting)} />
-            <Figure label="Meetings, no reply" value={n(m.meetingsAwaiting)} tone="wait" onOpen={() => open("Meetings awaiting reply" + tag, m.meetingsAwaiting)} />
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-[color:var(--admin-rule)] pt-4">
-            <Figure label="Online now" value={n(m.onlineNow)} onOpen={() => open("Online now" + tag, m.onlineNow)} />
-            <Figure
-              label="CGPA to check"
-              value={n(m.cgpaPending)}
-              tone="wait"
-              onOpen={() => open("Awaiting CGPA check" + tag, m.cgpaPending)}
+          {profileView === "work" ? (
+            <DotField
+              key="work"
+              label="Students by open to work"
+              groups={[
+                { key: "o", label: "Open to work", ids: m.openToWork.ids, color: C_MAIN, onOpen: () => open("Open to work" + tag, m.openToWork) },
+                { key: "h", label: "Hidden", ids: m.hidden.ids, color: C_WAIT, onOpen: () => open("Hidden profiles" + tag, m.hidden) },
+              ]}
             />
-          </div>
+          ) : (
+            <DotField
+              key="college"
+              label="Students by college or individual"
+              groups={[
+                { key: "c", label: "College-associated", ids: m.collegeLinked.ids, color: C_MAIN, onOpen: () => open("College-associated students" + tag, m.collegeLinked) },
+                { key: "i", label: "Individual", ids: m.individual.ids, color: C_WAIT, onOpen: () => open("Individual accounts" + tag, m.individual) },
+              ]}
+            />
+          )}
         </Card>
 
-        <Card title="Offers and meetings" sub="Every offer and meeting so far" className="lg:col-span-8">
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Split
-              label="Internship proposals"
-              totalLabel="decided"
-              open={open}
-              parts={[
-                { key: "a", label: "Accepted", list: m.internshipAccepted, title: "Internship proposals accepted" + tag, color: C_MAIN },
-                { key: "r", label: "Rejected", list: m.internshipRejected, title: "Internship proposals rejected" + tag, color: C_GREY },
-              ]}
+        <Card title="Hired" sub="Students with a paid hire, and their guarantee" className="lg:col-span-5">
+          <div className="mb-5">
+            <FacePile faces={faces(m.hired, 8)} total={n(m.hired)} max={8} onOpen={() => open("Hired" + tag, m.hired)} label={`See all ${fmt(n(m.hired))} hired`} />
+          </div>
+          <div className="space-y-6">
+            <Versus
+              title="Where they work"
+              left={{ label: "Indian companies", value: n(m.workIndia), onOpen: () => open("Working for Indian companies" + tag, m.workIndia) }}
+              right={{ label: "Foreign", value: n(m.workAbroad), onOpen: () => open("Working for foreign companies" + tag, m.workAbroad), color: C_WAIT }}
             />
-            <Split
-              label="Full-time offers"
-              totalLabel="decided"
-              open={open}
-              parts={[
-                { key: "a", label: "Accepted", list: m.fullTimeAccepted, title: "Full-time offers accepted" + tag, color: C_MAIN },
-                { key: "r", label: "Rejected", list: m.fullTimeRejected, title: "Full-time offers rejected" + tag, color: C_GREY },
-              ]}
-            />
-            <Split
-              label="Meetings"
-              totalLabel="finished"
-              open={open}
-              parts={[
-                { key: "c", label: "Completed", list: m.meetsCompleted, title: "Meetings completed" + tag, color: C_MAIN },
-                { key: "e", label: "Expired", list: m.meetsExpired, title: "Meetings expired" + tag, color: C_GREY },
-              ]}
-            />
-            <div className="flex items-end justify-between gap-3 sm:border-l sm:border-[color:var(--admin-rule)] sm:pl-5">
-              <Figure label="Offers expired" value={n(m.offersExpired)} hint="Not answered before they lapsed" onOpen={() => open("Offers expired" + tag, m.offersExpired)} />
+            <div>
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <span className="text-sm font-medium text-foreground">Placement guarantee</span>
+                <span className="text-xs tabular-nums text-text-subtle">{fmt(n(m.aiInterviewed))} after the AI interview</span>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {(
+                  [
+                    ["Active", m.guaranteeActive, "Guarantee active", C_MAIN],
+                    ["Ended", m.guaranteeEnded, "Guarantee ended", C_WAIT],
+                    ["None", m.guaranteeNone, "No guarantee (college code)", C_GREY],
+                  ] as const
+                ).map(([l, list, title, color]) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => open(title + tag, list)}
+                    className="group rounded-xl bg-[color:var(--admin-panel-2)] px-3 py-2.5 text-left outline-none transition-colors hover:bg-ink-100 focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <span className="flex items-center gap-1.5 text-xs text-text-subtle">
+                      <span className="size-2 rounded-full" style={{ background: color }} aria-hidden />
+                      {l}
+                    </span>
+                    <CountUp value={n(list)} className="mt-1 block text-xl font-semibold text-foreground" />
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        </Card>
-
-        <Card title="Profiles" sub="Who employers can find" className="lg:col-span-6">
-          <div className="space-y-5">
-            <Split
-              label="Open to work or hidden"
-              open={open}
-              parts={[
-                { key: "o", label: "Open to work", list: m.openToWork, title: "Open to work" + tag, color: C_MAIN },
-                { key: "h", label: "Hidden", list: m.hidden, title: "Hidden profiles" + tag, color: C_GREY },
-              ]}
-            />
-            <Split
-              label="College or individual"
-              open={open}
-              parts={[
-                { key: "c", label: "College-associated", list: m.collegeLinked, title: "College-associated students" + tag, color: C_MAIN },
-                { key: "i", label: "Individual", list: m.individual, title: "Individual accounts" + tag, color: C_SOFT },
-              ]}
-            />
-          </div>
-        </Card>
-
-        <Card title="Hired and the guarantee" sub="Students with a paid hire" className="lg:col-span-6">
-          <div className="space-y-5">
-            <Split
-              label="Where they work"
-              open={open}
-              parts={[
-                { key: "in", label: "Indian companies", list: m.workIndia, title: "Working for Indian companies" + tag, color: C_MAIN },
-                { key: "ab", label: "Foreign companies", list: m.workAbroad, title: "Working for foreign companies" + tag, color: C_WAIT },
-              ]}
-            />
-            <Split
-              label="Placement guarantee, after the AI interview"
-              open={open}
-              parts={[
-                { key: "a", label: "Active", list: m.guaranteeActive, title: "Guarantee active" + tag, color: C_MAIN },
-                { key: "e", label: "Ended", list: m.guaranteeEnded, title: "Guarantee ended" + tag, color: C_WAIT },
-                { key: "n", label: "No guarantee", list: m.guaranteeNone, title: "No guarantee (college code)" + tag, color: C_GREY },
-              ]}
-            />
           </div>
         </Card>
       </div>
@@ -465,11 +581,18 @@ function StudentsView({ data, track, setTrack, open, links }: { data: DashboardB
 
 function EmployersView({ data, open }: { data: DashboardBoard; open: Open }) {
   const m = useMemo(() => employerMetrics(data), [data]);
+  const nameOf = useMemo(() => new Map(data.employers.map((e) => [e.id, e.company])), [data.employers]);
   const n = (l: MetricList) => l.ids.length;
-  const maxSize = Math.max(1, ...m.sizes.map((s) => n(s.list)));
+  const faces = (l: MetricList, max = 6): Face[] => l.ids.slice(0, max).map((id) => ({ id, name: nameOf.get(id) ?? "Company" }));
   const stop = (key: string, label: string, title: string, list: MetricList, next: MetricList | null, extra: Partial<Station> = {}): Station => {
     const waiting = next ? minus(list, next) : null;
-    return { key, label, reached: n(list), waiting: waiting ? n(waiting) : undefined, onOpen: () => open(title, list, waiting ?? undefined), ...extra };
+    return {
+      key, label, reached: n(list), waiting: waiting ? n(waiting) : undefined,
+      faces: waiting ? faces(waiting, 4) : undefined,
+      onOpenWaiting: waiting ? () => open(title, list, waiting) : undefined,
+      onOpen: () => open(title, list, waiting ?? undefined),
+      ...extra,
+    };
   };
   const spur = (key: string, label: string, list: MetricList, title = label) => ({ key, label, count: n(list), onOpen: () => open(title, list) });
   const journey: Station[] = [
@@ -488,94 +611,108 @@ function EmployersView({ data, open }: { data: DashboardBoard; open: Open }) {
     { key: `${key}-sent`, label: "Offers sent", reached: n(sent), onOpen: () => open(`${label} offers sent`, sent) },
     { key: `${key}-hired`, label: "Hired", reached: n(hired), tone: "end", caption: `${pct(n(hired), n(sent)) ?? 0}% of offers`, onOpen: () => open(`Hired on ${label.toLowerCase()}`, hired) },
   ];
+  // Company size as stacked companies: each block is one employer, so four companies read as four, not as a bar.
+  const maxSize = Math.max(1, ...m.sizes.map((s) => n(s.list)));
+  const blocks = maxSize <= 14;
 
   return (
     <div className="space-y-[var(--admin-gap)]">
-      <section className={cn(ADMIN_SURFACE, "p-[var(--admin-pad-panel)] md:p-6")}>
-        <h2 className="max-w-3xl text-pretty text-lg font-medium leading-snug text-foreground md:text-xl">
-          {stuck ? (
-            <>
-              {fmt(stuck.waiting ?? 0)} of {fmt(stuck.reached)} at <span className="text-accent-700">{stuck.label}</span> have not moved on yet.{" "}
-            </>
-          ) : null}
-          {fmt(n(m.madeHire))} of {fmt(n(m.signedUp))} employers have hired on Findtern.
-        </h2>
-        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-text-subtle" aria-hidden>
-          <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-4 rounded-full bg-brand-700" />On the line</span>
-          <span className="inline-flex items-center gap-1.5"><span className="size-[5px] rounded-full bg-accent-500" />1 company waiting</span>
-          <span>Amber arc: share still waiting</span>
-        </div>
-        <div className="mt-6 overflow-x-auto pb-1">
-          <Metro stations={journey} perDot={1} className="md:min-w-[40rem]" />
-        </div>
-      </section>
-
-      <Card title="Company size" sub="Headcount each employer gave at signup, in people">
-        <ul className="grid h-52 grid-cols-7 items-end gap-2 border-b border-[color:var(--admin-rule)] sm:gap-4">
-          {m.sizes.map((s) => (
-            <li key={s.bucket} className="flex h-full min-w-0 flex-col justify-end">
-              <button
-                type="button"
-                onClick={() => open(`Company size: ${s.bucket}`, s.list)}
-                aria-label={`${s.bucket}: ${fmt(n(s.list))} employers. Open the list`}
-                className="group flex h-full flex-col items-center justify-end gap-1.5 rounded-t-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <span className="text-sm font-semibold tabular-nums text-foreground">{fmt(n(s.list))}</span>
-                <span
-                  className="block w-full max-w-16 rounded-t-md transition-[height] duration-500 group-hover:opacity-85 motion-reduce:transition-none"
-                  style={{ height: `${(n(s.list) / maxSize) * 80}%`, minHeight: n(s.list) ? "0.375rem" : "2px", background: n(s.list) ? (s.bucket === "Not given" ? C_GREY : C_MAIN) : "var(--color-ink-200)" }}
-                />
-              </button>
-            </li>
-          ))}
-        </ul>
-        <ul className="mt-2 grid grid-cols-7 gap-2 sm:gap-4" aria-hidden>
-          {m.sizes.map((s) => (
-            <li key={s.bucket} className="text-center text-xs tabular-nums text-text-subtle">
-              {s.bucket}
-            </li>
-          ))}
-        </ul>
-      </Card>
+      <NightPanel
+        headline={
+          <>
+            {stuck ? (
+              <>
+                <span className="text-accent-300">{fmt(stuck.waiting ?? 0)}</span> of {fmt(stuck.reached)} employers are stuck at {stuck.label}.{" "}
+              </>
+            ) : null}
+            <span className="text-[#a9cbbd]">
+              {fmt(n(m.madeHire))} of {fmt(n(m.signedUp))} have hired on Findtern.
+            </span>
+          </>
+        }
+        note={`${fmt(n(m.inDriveNow))} in a campus drive right now · ${fmt(n(m.fteRequested))} waiting for FTE approval`}
+      >
+        <Metro stations={journey} theme="night" className="md:min-w-[44rem]" />
+      </NightPanel>
 
       <div className="grid gap-[var(--admin-gap)] lg:grid-cols-12">
-        <Card title="Where they come from" className="lg:col-span-5">
-          <div className="space-y-5">
-            <Split
-              label="How they found Findtern"
-              open={open}
-              parts={[
-                { key: "d", label: "College drive", list: m.viaDrive, title: "Came through a college drive", color: C_MAIN },
-                { key: "x", label: "Directly", list: m.direct, title: "Came directly", color: C_SOFT },
-              ]}
-            />
-            <Split
-              label="Country"
-              open={open}
-              parts={[
-                { key: "in", label: "Indian", list: m.indian, title: "Indian employers", color: C_MAIN },
-                { key: "ab", label: "Other countries", list: m.foreign, title: "Employers outside India", color: C_WAIT },
-              ]}
-            />
-          </div>
+        <Card title="Company size" sub="Headcount each employer gave at signup, in people" className="lg:col-span-7">
+          <ul className="grid h-56 grid-cols-7 items-end gap-2 border-b border-[color:var(--admin-rule)] sm:gap-3">
+            {m.sizes.map((s) => {
+              const c = n(s.list);
+              return (
+                <li key={s.bucket} className="flex h-full min-w-0 flex-col justify-end">
+                  <button
+                    type="button"
+                    onClick={() => open(`Company size: ${s.bucket}`, s.list)}
+                    aria-label={`${s.bucket}: ${fmt(c)} employers. Open the list`}
+                    className="group flex h-full flex-col items-center justify-end gap-1 rounded-t-lg pb-px outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <span className="text-sm font-semibold tabular-nums text-foreground">{fmt(c)}</span>
+                    {blocks ? (
+                      <span className="flex w-full max-w-14 flex-col-reverse gap-[3px]">
+                        {s.list.ids.map((id, i) => (
+                          <span
+                            key={id}
+                            title={nameOf.get(id)}
+                            className="board-dot grid h-7 place-items-center rounded-md text-[0.625rem] font-semibold transition-transform group-hover:-translate-y-0.5"
+                            style={{ background: s.bucket === SIZE_UNKNOWN ? C_GREY : C_MAIN, color: "#fff", animationDelay: `${i * 70}ms` }}
+                          >
+                            {initials(nameOf.get(id) ?? "")}
+                          </span>
+                        ))}
+                        {c === 0 ? <span className="h-0.5 rounded-full bg-ink-200" /> : null}
+                      </span>
+                    ) : (
+                      <span className="block w-full max-w-14 rounded-t-md" style={{ height: `${(c / maxSize) * 78}%`, minHeight: c ? 6 : 2, background: c ? (s.bucket === SIZE_UNKNOWN ? C_GREY : C_MAIN) : "var(--color-ink-200)" }} />
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <ul className="mt-2 grid grid-cols-7 gap-2 sm:gap-3" aria-hidden>
+            {m.sizes.map((s) => (
+              <li key={s.bucket} className="text-center text-xs tabular-nums text-text-subtle">{s.bucket}</li>
+            ))}
+          </ul>
         </Card>
 
-        <Card title="Offers and hires" sub="Proposals sent, and the ones that became a paid hire" className="lg:col-span-7">
-          <div className="grid gap-6 sm:grid-cols-2">
-            {(
-              [
-                ["int", "Internship", m.internshipOffers, m.hiredInternship],
-                ["ft", "Full-time", m.fullTimeOffers, m.hiredFullTime],
-              ] as const
-            ).map(([k, l, sent, hired]) => (
-              <div key={k} className="min-w-0">
-                <h3 className="mb-3 text-sm font-medium text-text-subtle">{l}</h3>
-                <Metro stations={line(k, l, sent, hired)} />
-              </div>
-            ))}
+        <Card title="Where they come from" className="lg:col-span-5">
+          <div className="space-y-6">
+            <Versus
+              title="How they found Findtern"
+              left={{ label: "College drive", value: n(m.viaDrive), onOpen: () => open("Came through a college drive", m.viaDrive) }}
+              right={{ label: "Directly", value: n(m.direct), onOpen: () => open("Came directly", m.direct), color: C_SOFT }}
+            />
+            <Versus
+              title="Country"
+              left={{ label: "Indian", value: n(m.indian), onOpen: () => open("Indian employers", m.indian) }}
+              right={{ label: "Other countries", value: n(m.foreign), onOpen: () => open("Employers outside India", m.foreign), color: C_WAIT }}
+            />
+            <div className="flex flex-wrap items-center gap-3 border-t border-[color:var(--admin-rule)] pt-4">
+              <FacePile faces={faces(m.signedUp, 8)} total={n(m.signedUp)} max={8} onOpen={() => open("All employers", m.signedUp)} label="See every employer" />
+              <span className="text-sm text-text-subtle">every employer on Findtern</span>
+            </div>
           </div>
         </Card>
       </div>
+
+      <Card title="Offers and hires" sub="Proposals sent, and the ones that became a paid hire">
+        <div className="grid gap-8 md:grid-cols-2">
+          {(
+            [
+              ["int", "Internship", m.internshipOffers, m.hiredInternship],
+              ["ft", "Full-time", m.fullTimeOffers, m.hiredFullTime],
+            ] as const
+          ).map(([k, l, sent, hired]) => (
+            <div key={k} className="min-w-0">
+              <h3 className="mb-4 text-sm font-medium text-text-subtle">{l}</h3>
+              <Metro stations={line(k, l, sent, hired)} />
+            </div>
+          ))}
+        </div>
+      </Card>
     </div>
   );
 }

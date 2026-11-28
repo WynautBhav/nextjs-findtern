@@ -1,12 +1,15 @@
 "use client";
 
-import { Bell, Columns3, Copy, Download, Mail, Phone } from "lucide-react";
+import { Bell, Check, Columns3, Copy, Download, Mail, Phone, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
+
+import { csvText, pinnedOf, shownColumns, tableCsv } from "./table-csv";
+import { CountUp, FacePile, initials, tintOf } from "./visuals";
 
 /**
  * The list behind any number on the dashboard: select rows, copy, email (bcc), call one, nudge students (manual, after
@@ -21,6 +24,10 @@ export type DrawerRow = {
   name: string;
   sub: string;
   note?: string;
+  /** What happened with this person, in one line (their latest step). */
+  what?: string;
+  /** Last seen, already worded ("3 h ago", "Never", "Hidden"). */
+  seen?: string;
   chip?: { label: string; tone: "good" | "wait" | "bad" | "plain" };
   email: string | null;
   phone: string | null;
@@ -47,16 +54,8 @@ const CHIP: Record<NonNullable<DrawerRow["chip"]>["tone"], string> = {
 
 const PAGE = 100;
 
-function csvCell(v: unknown): string {
-  const s = v == null ? "" : String(v);
-  // A leading = + - @ would run as a formula in a spreadsheet.
-  // A leading = + - @ would run as a formula in a spreadsheet; a phone number ("+91 98765 43210") is left as it is.
-  const safe = /^[=@\t\r]/.test(s) || (/^[+-]/.test(s) && !/^[+-][\d\s()-]+$/.test(s)) ? `'${s}` : s;
-  return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-}
-
-function download(name: string, rows: (string | number | null)[][]) {
-  const blob = new Blob(["﻿" + rows.map((r) => r.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+function download(name: string, table: string[][]) {
+  const blob = new Blob([csvText(table)], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = name;
@@ -76,11 +75,14 @@ export function PeopleDrawer({
   onToast: (text: string, bad?: boolean) => void;
 }) {
   return (
-    <Sheet open={spec !== null} onOpenChange={(o) => (o ? null : onClose())}>
-      <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-xl">
+    <Dialog open={spec !== null} onOpenChange={(o) => (o ? null : onClose())}>
+      <DialogContent
+        showCloseButton={false}
+        className="flex h-[min(50rem,calc(100dvh-1.5rem))] max-h-none max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-[1.75rem] border-0 bg-background p-0 shadow-[0_30px_80px_-20px_rgb(4_29_23/0.55),0_2px_6px_rgb(4_29_23/0.12)] sm:max-w-[min(80rem,calc(100%-3rem))]"
+      >
         {spec ? <DrawerBody key={spec.title + spec.rows.length} spec={spec} canNudge={canNudge} onToast={onToast} /> : null}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -92,12 +94,25 @@ function DrawerBody({ spec: full, canNudge, onToast: pageToast }: { spec: Drawer
     pageToast(text, bad);
   };
   const [tab, setTab] = useState<"wait" | "all">(full.waitingIds ? "wait" : "all");
-  const spec = useMemo(() => (tab === "wait" && full.waitingIds ? { ...full, rows: full.rows.filter((r) => full.waitingIds!.has(r.id)) } : full), [full, tab]);
+  const [q, setQ] = useState("");
+  const spec = useMemo(() => {
+    let rows = tab === "wait" && full.waitingIds ? full.rows.filter((r) => full.waitingIds!.has(r.id)) : full.rows;
+    // Every word must match the name, email, phone, college line, what happened or the offer note.
+    const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length) rows = rows.filter((r) => { const hay = [r.name, r.email, r.phone, r.sub, r.note, r.what].join(" ").toLowerCase(); return words.every((w) => hay.includes(w)); });
+    return { ...full, rows };
+  }, [full, tab, q]);
+  // The header counts the tab (not the search), in words that match it.
+  const tabCount = tab === "wait" && full.waitingIds ? full.waitingIds.size : full.rows.length;
+  const tabLabel = full.waitingIds ? (tab === "wait" ? "waiting here" : "reached this point") : full.sub.replace(/^[\d,]+\s/, "");
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [limit, setLimit] = useState(PAGE);
   const columns = useMemo(() => Object.keys(full.rows[0]?.csv ?? {}), [full.rows]);
   const [cols, setCols] = useState<Set<string>>(() => new Set(columns));
   const [colOpen, setColOpen] = useState(false);
+  // The table and the CSV share one rule: the pinned name column, then the columns switched on, in this order.
+  const pinned = pinnedOf(columns);
+  const shownCols = shownColumns(columns, cols);
   const [nudge, setNudge] = useState<{ title: string; message: string } | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -128,9 +143,8 @@ function DrawerBody({ spec: full, canNudge, onToast: pageToast }: { spec: Drawer
   }
 
   function exportCsv() {
-    if (!target.length || cols.size === 0) return;
-    const keep = columns.filter((c) => cols.has(c));
-    download(spec.filename, [keep, ...target.map((r) => keep.map((c) => r.csv[c] ?? ""))]);
+    if (!target.length) return;
+    download(spec.filename, tableCsv(columns, cols, target));
   }
 
   async function sendNudge() {
@@ -164,16 +178,35 @@ function DrawerBody({ spec: full, canNudge, onToast: pageToast }: { spec: Drawer
   const allMail = emails.join(",");
   const mailto = `mailto:?bcc=${encodeURIComponent(allMail.length > 1800 ? allMail.slice(0, allMail.lastIndexOf(",", 1800)) : allMail)}`;
   const one = picked.length === 1 ? picked[0] : null;
+  const dock =
+    "inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm text-foreground transition-colors hover:bg-[color:var(--color-ink-100)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring aria-disabled:pointer-events-none aria-disabled:opacity-40 touch:h-11";
   const btn =
     "inline-flex h-9 items-center gap-1.5 rounded-full border border-ink-200 px-3 text-sm text-foreground transition-colors hover:border-ink-300 hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-disabled:pointer-events-none aria-disabled:opacity-45 touch:h-11";
+  const shownFaces = spec.rows.slice(0, 6).map((r) => ({ id: r.targetId, name: r.name }));
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="border-b border-ink-200 px-5 pb-4 pt-5 pr-14">
-        <SheetTitle className="text-lg font-semibold leading-snug text-foreground">{spec.title}</SheetTitle>
-        <SheetDescription className="mt-0.5 text-sm text-text-subtle">{full.sub}</SheetDescription>
+      {/* The window's head is the hero's deep green: the list feels like it came out of the line. */}
+      <header className="relative overflow-hidden bg-[#0a3a2c] px-6 pb-5 pt-6 text-[#f2faf6]">
+        <svg aria-hidden className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.08]" preserveAspectRatio="none" viewBox="0 0 100 100">
+          <path d="M-5 90 C 30 80, 45 35, 70 40 S 95 20, 105 12" fill="none" stroke="#fff" strokeWidth="0.7" />
+        </svg>
+        <div className="relative flex items-start justify-between gap-4">
+          <DialogTitle className="text-balance text-xl font-medium leading-snug tracking-[-0.01em] text-[#f2faf6] sm:text-2xl">{spec.title}</DialogTitle>
+          <DialogClose className="grid size-9 shrink-0 place-items-center rounded-full bg-white/10 text-[#f2faf6] transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white touch:size-11">
+            <X className="size-4" aria-hidden />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+        </div>
+        <div className="relative mt-3 flex flex-wrap items-end justify-between gap-3">
+          <div className="flex items-baseline gap-2">
+            <CountUp value={tabCount} className="text-[2.5rem] font-semibold leading-none tracking-[-0.03em]" />
+            <DialogDescription className="text-sm text-[#a9cbbd]">{tabLabel}</DialogDescription>
+          </div>
+          <FacePile faces={shownFaces} total={spec.rows.length} max={5} size="sm" ring="#0a3a2c" label={`${spec.rows.length} in this list`} />
+        </div>
         {full.waitingIds ? (
-          <div role="group" aria-label="Which people" className="mt-3 inline-flex rounded-full bg-ink-100 p-0.5">
+          <div role="group" aria-label="Which people" className="relative mt-4 inline-flex rounded-full bg-white/10 p-1">
             {(
               [
                 ["wait", "Waiting here", full.waitingIds.size],
@@ -190,183 +223,230 @@ function DrawerBody({ spec: full, canNudge, onToast: pageToast }: { spec: Drawer
                   setLimit(PAGE);
                 }}
                 className={cn(
-                  "h-8 rounded-full px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:h-11",
-                  tab === k ? "bg-background font-medium text-foreground shadow-sm" : "text-text-subtle hover:text-foreground",
+                  "h-8 rounded-full px-3.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white touch:h-11",
+                  tab === k ? "bg-[#f2faf6] font-medium text-[#0a3a2c]" : "text-[#cfe6db] hover:text-white",
                 )}
               >
-                {l} <span className="tabular-nums">{c.toLocaleString("en-IN")}</span>
+                {l} <span className="tabular-nums opacity-70">{c.toLocaleString("en-IN")}</span>
               </button>
             ))}
           </div>
         ) : null}
       </header>
 
-      <div className="relative flex flex-wrap items-center gap-2 border-b border-ink-200 px-5 py-3">
-        <label className="mr-auto inline-flex items-center gap-2 text-sm text-text-subtle">
+      <div className="relative flex flex-wrap items-center gap-2 border-b border-ink-100 px-4 py-3 sm:px-5">
+        <label className="relative w-full">
+          <span className="sr-only">Search this list</span>
+          <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setSel(new Set());
+              setLimit(PAGE);
+            }}
+            placeholder="Search"
+            className="h-11 w-full rounded-full border border-ink-200 bg-ink-50 pl-10 pr-4 text-sm text-foreground placeholder:text-ink-400 focus-visible:border-brand-500 focus-visible:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
+          />
+        </label>
+        <label className="mr-auto inline-flex cursor-pointer max-sm:w-full items-center gap-2.5 rounded-full py-1 pl-1 pr-2 text-sm text-text-subtle">
           <input
             type="checkbox"
-            className="size-4 accent-[var(--color-brand-700)]"
+            className="peer sr-only"
             checked={allOn}
             onChange={() => setSel(allOn ? new Set() : new Set(spec.rows.map((r) => r.id)))}
             aria-label="Select everyone in this list"
           />
-          <span className="tabular-nums">{picked.length ? `${picked.length.toLocaleString("en-IN")} selected` : `${spec.rows.length.toLocaleString("en-IN")} in list`}</span>
+          <span aria-hidden className={cn("grid size-5 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring", allOn ? "border-brand-700 bg-brand-700 text-white" : picked.length ? "border-brand-700 bg-brand-100" : "border-ink-300")}>
+            {allOn ? <Check className="size-3.5" /> : picked.length ? <span className="h-0.5 w-2.5 rounded bg-brand-700" /> : null}
+          </span>
+          <span className="tabular-nums">{picked.length ? <><strong className="font-semibold text-foreground">{picked.length.toLocaleString("en-IN")}</strong> selected</> : `${spec.rows.length.toLocaleString("en-IN")} ${q ? "found" : "in list"}`}</span>
         </label>
-        <button type="button" className={btn} onClick={copy} aria-disabled={!target.length} title={`Copy name, email and phone of ${scope}`}>
-          <Copy className="size-4" aria-hidden />
-          Copy
-        </button>
-        <a className={btn} href={emails.length ? mailto : undefined} aria-disabled={!emails.length} title={`Email ${scope}`}>
-          <Mail className="size-4" aria-hidden />
-          Email
-        </a>
-        <a className={btn} href={one?.phone ? `tel:${one.phone.replace(/\s/g, "")}` : undefined} aria-disabled={!one?.phone} title={one ? "Call" : "Select one to call"}>
-          <Phone className="size-4" aria-hidden />
-          Call
-        </a>
-        {spec.kind === "students" && canNudge ? (
-          <button
-            type="button"
-            className={btn}
-            aria-disabled={!targetIds.length}
-            onClick={() => (targetIds.length ? setNudge({ title: "A quick nudge from Findtern", message: "" }) : null)}
-            title={`Nudge ${scope}`}
-          >
-            <Bell className="size-4" aria-hidden />
-            Nudge
+        <div className="flex items-center rounded-full bg-ink-50 p-0.5">
+          <button type="button" className={dock} onClick={copy} aria-disabled={!target.length} title={`Copy name, email and phone of ${scope}`} aria-label="Copy">
+            <Copy className="size-4" aria-hidden />
+            <span className="max-sm:hidden">Copy</span>
           </button>
-        ) : null}
-        <button type="button" className={cn(btn, "px-2.5")} onClick={() => setColOpen((o) => !o)} aria-expanded={colOpen} aria-label="Choose export columns">
-          <Columns3 className="size-4" aria-hidden />
-        </button>
+          <a className={dock} href={emails.length ? mailto : undefined} aria-disabled={!emails.length} title={`Email ${scope}`} aria-label="Email">
+            <Mail className="size-4" aria-hidden />
+            <span className="max-sm:hidden">Email</span>
+          </a>
+          <a className={dock} href={one?.phone ? `tel:${one.phone.replace(/\s/g, "")}` : undefined} aria-disabled={!one?.phone} title={one ? "Call" : "Select one to call"} aria-label="Call">
+            <Phone className="size-4" aria-hidden />
+            <span className="max-sm:hidden">Call</span>
+          </a>
+          {spec.kind === "students" && canNudge ? (
+            <button type="button" className={dock} aria-disabled={!targetIds.length} onClick={() => (targetIds.length ? setNudge({ title: "A quick nudge from Findtern", message: "" }) : null)} title={`Nudge ${scope}`} aria-label="Nudge">
+              <Bell className="size-4" aria-hidden />
+              <span className="max-sm:hidden">Nudge</span>
+            </button>
+          ) : null}
+          <button type="button" className={dock} onClick={() => setColOpen((o) => !o)} aria-expanded={colOpen} aria-label="Choose columns" title="Choose columns">
+            <Columns3 className="size-4" aria-hidden />
+            <span className="max-sm:hidden">Columns</span>
+          </button>
+        </div>
         <button
           type="button"
           onClick={exportCsv}
-          aria-disabled={!target.length || cols.size === 0}
-          className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-3.5 text-sm text-white transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-disabled:pointer-events-none aria-disabled:opacity-45 touch:h-11"
+          aria-disabled={!target.length}
+          className="inline-flex h-10 items-center gap-1.5 rounded-full bg-brand-700 px-4 text-sm font-medium text-white transition-colors hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-disabled:pointer-events-none aria-disabled:opacity-45 touch:h-11"
         >
           <Download className="size-4" aria-hidden />
           CSV
         </button>
         {colOpen ? (
-          <fieldset className="w-full rounded-xl border border-ink-200 p-3">
-            <legend className="px-1 text-xs text-text-subtle">Columns in the CSV</legend>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
-              {columns.map((c) => (
-                <label key={c} className="flex items-center gap-2 text-sm text-foreground">
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-[var(--color-brand-700)]"
-                    checked={cols.has(c)}
-                    onChange={() =>
-                      setCols((s) => {
-                        const n = new Set(s);
-                        if (n.has(c)) n.delete(c);
-                        else n.add(c);
-                        return n;
-                      })
-                    }
-                  />
-                  {c}
-                </label>
-              ))}
+          <fieldset className="w-full rounded-2xl bg-ink-50 p-3">
+            <legend className="sr-only">Columns</legend>
+            <p className="mb-2 text-xs text-text-subtle">Columns shown here and in the CSV</p>
+            <div className="flex flex-wrap gap-1.5">
+              {columns.filter((c) => c !== pinned).map((c) => {
+                const on = cols.has(c);
+                return (
+                  <label key={c} className={cn("inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring", on ? "border-brand-700 bg-brand-700 text-white" : "border-ink-200 bg-background text-text-subtle hover:border-ink-300")}>
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={on}
+                      onChange={() =>
+                        setCols((x) => {
+                          const n = new Set(x);
+                          if (n.has(c)) n.delete(c);
+                          else n.add(c);
+                          return n;
+                        })
+                      }
+                    />
+                    {on ? <Check className="size-3" aria-hidden /> : null}
+                    {c}
+                  </label>
+                );
+              })}
             </div>
           </fieldset>
         ) : null}
       </div>
 
-      <p role={notice?.bad ? "alert" : "status"} className={cn("px-5 text-sm", notice ? "py-2" : "sr-only", notice?.bad ? "bg-[#fdecec] text-[#9b1c1c]" : "bg-brand-50 text-brand-800")}>
+      <p role={notice?.bad ? "alert" : "status"} className={cn("text-sm", notice ? "mx-4 mt-3 rounded-xl px-3 py-2 sm:mx-5" : "sr-only", notice?.bad ? "bg-[#fdecec] text-[#9b1c1c]" : "bg-brand-50 text-brand-800")}>
         {notice?.text ?? ""}
       </p>
 
       {nudge ? (
         <form
-          className="space-y-3 border-b border-ink-200 bg-accent-100/50 px-5 py-4"
+          className="mx-4 mt-3 space-y-3 rounded-2xl border border-accent-200 bg-accent-100/60 p-4 sm:mx-5"
           onSubmit={(e) => {
             e.preventDefault();
             void sendNudge();
           }}
         >
           <p className="text-sm text-foreground">
-            Send an in-app notification and email to <strong className="font-semibold tabular-nums">{targetIds.length.toLocaleString("en-IN")}</strong>{" "}
-            {targetIds.length === 1 ? "student" : "students"}. Nothing is sent until you press Send.
+            An in-app notification and email to <strong className="font-semibold tabular-nums">{targetIds.length.toLocaleString("en-IN")}</strong> {targetIds.length === 1 ? "student" : "students"}. Nothing goes out until you press Send.
           </p>
           <label className="block text-sm">
             <span className="text-text-subtle">Title</span>
-            <input
-              required
-              maxLength={200}
-              value={nudge.title}
-              onChange={(e) => setNudge({ ...nudge, title: e.target.value })}
-              className="mt-1 h-10 w-full rounded-lg border border-ink-200 bg-background px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-            />
+            <input required maxLength={200} value={nudge.title} onChange={(e) => setNudge({ ...nudge, title: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-ink-200 bg-background px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring" />
           </label>
           <label className="block text-sm">
             <span className="text-text-subtle">Message</span>
-            <textarea
-              required
-              maxLength={4000}
-              rows={3}
-              value={nudge.message}
-              onChange={(e) => setNudge({ ...nudge, message: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-ink-200 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-            />
+            <textarea required maxLength={4000} rows={3} value={nudge.message} onChange={(e) => setNudge({ ...nudge, message: e.target.value })} className="mt-1 w-full rounded-xl border border-ink-200 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring" />
           </label>
           <div className="flex justify-end gap-2">
-            <button type="button" className={btn} onClick={() => setNudge(null)}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={sending}
-              className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-sm text-white hover:bg-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:h-11"
-            >
+            <button type="button" className={btn} onClick={() => setNudge(null)}>Cancel</button>
+            <button type="submit" disabled={sending} className="inline-flex h-9 items-center rounded-full bg-brand-700 px-4 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:h-11">
               {sending ? "Sending" : "Send nudge"}
             </button>
           </div>
         </form>
       ) : null}
 
-      <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5" aria-label={spec.title}>
-        {spec.rows.length === 0 ? <li className="py-12 text-center text-sm text-text-subtle">No one here right now</li> : null}
-        {spec.rows.slice(0, limit).map((r) => (
-          <li key={r.id} className="flex items-center gap-3 border-b border-ink-100 py-2.5 last:border-b-0">
-            <input type="checkbox" className="size-4 shrink-0 accent-[var(--color-brand-700)]" checked={sel.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Select ${r.name}`} />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium text-foreground">
-                {r.href ? (
-                  <Link href={r.href} className="hover:underline focus-visible:outline-2 focus-visible:outline-ring">
-                    {r.name}
-                  </Link>
-                ) : (
-                  r.name
-                )}
-              </div>
-              <div className="truncate text-xs text-text-subtle">{r.note ? `${r.note} · ${r.sub}` : r.sub}</div>
-            </div>
-            {r.chip ? <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", CHIP[r.chip.tone])}>{r.chip.label}</span> : null}
-            <span className="flex shrink-0 items-center">
-              {r.phone ? (
-                <a href={`tel:${r.phone.replace(/\s/g, "")}`} aria-label={`Call ${r.name}`} className="grid size-8 place-items-center rounded-full text-ink-600 hover:bg-ink-100 touch:size-11">
-                  <Phone className="size-4" aria-hidden />
-                </a>
-              ) : null}
-              {r.email ? (
-                <a href={`mailto:${r.email}`} aria-label={`Email ${r.name}`} className="grid size-8 place-items-center rounded-full text-ink-600 hover:bg-ink-100 touch:size-11">
-                  <Mail className="size-4" aria-hidden />
-                </a>
-              ) : null}
-            </span>
-          </li>
-        ))}
+      {/* The list is a table: the columns picked above show here and go into the CSV. Name stays pinned on the left. */}
+      <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+        {spec.rows.length === 0 ? (
+          <div className="grid place-items-center gap-1 px-6 py-16 text-center">
+            <span className="text-base font-medium text-foreground">{q ? `No one matches “${q}”` : "No one here right now"}</span>
+            <span className="text-sm text-text-subtle">{q ? "Try a name, email, phone or college" : "When someone reaches this point they show up here"}</span>
+          </div>
+        ) : (
+          <table className="w-max min-w-full border-separate border-spacing-0 text-sm" aria-label={spec.title}>
+            <thead>
+              <tr>
+                <th scope="col" className="sticky left-0 top-0 z-20 bg-background px-4 py-2.5 text-left text-xs font-medium text-text-subtle shadow-[inset_0_-1px_0_var(--color-ink-100)] sm:px-5">
+                  {pinned ?? (spec.kind === "employers" ? "Company" : "Name")}
+                </th>
+                {shownCols.map((c) => (
+                  <th key={c} scope="col" className="sticky top-0 z-10 whitespace-nowrap bg-background px-3 py-2.5 text-left text-xs font-medium text-text-subtle shadow-[inset_0_-1px_0_var(--color-ink-100)]">
+                    {c}
+                  </th>
+                ))}
+                <th scope="col" className="sticky top-0 z-10 bg-background px-3 py-2.5 shadow-[inset_0_-1px_0_var(--color-ink-100)]">
+                  <span className="sr-only">Reach out</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {spec.rows.slice(0, limit).map((r) => {
+                const on = sel.has(r.id);
+                const cell = cn("border-b border-ink-100 transition-colors", on ? "bg-brand-50" : "bg-background group-hover:bg-ink-50");
+                return (
+                  <tr key={r.id} className="group">
+                    <td className={cn(cell, "sticky left-0 z-[1] px-4 py-2.5 sm:px-5")}>
+                      <div className="flex w-[15rem] items-center gap-3 sm:w-[17rem]">
+                        {/* The face is the checkbox: it turns into a tick when picked. */}
+                        <label className="relative shrink-0 cursor-pointer rounded-full has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2">
+                          <input type="checkbox" className="sr-only" checked={on} onChange={() => toggle(r.id)} aria-label={`Select ${r.name}`} />
+                          <span aria-hidden className={cn("grid size-9 place-items-center rounded-full text-xs font-semibold transition-all duration-200", on ? "scale-95 bg-brand-700 text-white" : "")} style={on ? undefined : tintOf(r.targetId)}>
+                            {on ? <Check className="size-4" /> : initials(r.name)}
+                          </span>
+                        </label>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="truncate font-medium text-foreground">
+                              {r.href ? <Link href={r.href} className="underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">{r.name}</Link> : r.name}
+                            </span>
+                            {r.chip ? <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[0.6875rem] font-medium", CHIP[r.chip.tone])}>{r.chip.label}</span> : null}
+                          </div>
+                          {r.note ? <div className="truncate text-xs text-text-subtle">{r.note}</div> : null}
+                        </div>
+                      </div>
+                    </td>
+                    {shownCols.map((c) => {
+                      const v = r.csv[c];
+                      const empty = v == null || v === "";
+                      return (
+                        <td key={c} className={cn(cell, "px-3 py-2.5 align-middle", c === "What happened" ? "min-w-[16rem] max-w-[22rem]" : "max-w-[16rem] whitespace-nowrap", empty ? "text-ink-400" : "text-foreground", typeof v === "number" && "tabular-nums")}>
+                          {c === "Last seen" && v === "Online now" ? <span className="font-medium text-brand-700">Online now</span> : empty ? "—" : <span className={c === "What happened" ? "line-clamp-2" : "block truncate"}>{String(v)}</span>}
+                        </td>
+                      );
+                    })}
+                    <td className={cn(cell, "px-3 py-2.5")}>
+                      <span className="flex items-center gap-0.5">
+                        {r.phone ? (
+                          <a href={`tel:${r.phone.replace(/\s/g, "")}`} aria-label={`Call ${r.name}`} className="grid size-8 place-items-center rounded-full text-ink-600 hover:bg-background hover:text-brand-700 touch:size-11">
+                            <Phone className="size-4" aria-hidden />
+                          </a>
+                        ) : null}
+                        {r.email ? (
+                          <a href={`mailto:${r.email}`} aria-label={`Email ${r.name}`} className="grid size-8 place-items-center rounded-full text-ink-600 hover:bg-background hover:text-brand-700 touch:size-11">
+                            <Mail className="size-4" aria-hidden />
+                          </a>
+                        ) : null}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
         {spec.rows.length > limit ? (
-          <li className="py-4 text-center">
+          <div className="sticky left-0 py-4 text-center">
             <button type="button" className={btn} onClick={() => setLimit((l) => l + PAGE)}>
               Show {Math.min(PAGE, spec.rows.length - limit).toLocaleString("en-IN")} more of {(spec.rows.length - limit).toLocaleString("en-IN")}
             </button>
-          </li>
+          </div>
         ) : null}
-      </ul>
+      </div>
     </div>
   );
 }
