@@ -144,6 +144,7 @@ export function studentMetrics(
   const hiredBy = (t: BoardOffer["track"]) => hired.filter((s) => hiredOffer.get(s.id)!.track === t);
   const withOffer = new Set(offers.map((o) => o.internId));
   const scored = students.filter((s) => s.aiStatus === "completed");
+  const reply = (t: BoardOffer["track"], r: OfferReply) => off(offers.filter((o) => o.track === t && o.reply === r));
 
   return {
     signedUp: stu(students),
@@ -166,10 +167,19 @@ export function studentMetrics(
     meetingsAwaiting: meet(meetings.filter((m) => m.stage === "sent")),
     meetsCompleted: meet(meetings.filter((m) => m.stage === "completed")),
     meetsExpired: meet(meetings.filter((m) => m.stage === "expired")),
-    internshipAccepted: off(offers.filter((o) => o.track === "internship" && o.reply === "accepted")),
-    internshipRejected: off(offers.filter((o) => o.track === "internship" && o.reply === "rejected")),
-    fullTimeAccepted: off(offers.filter((o) => o.track === "full_time" && o.reply === "accepted")),
-    fullTimeRejected: off(offers.filter((o) => o.track === "full_time" && o.reply === "rejected")),
+    // Each offer type: its total, split by the student's reply (the five parts add up to the total).
+    internshipAll: off(offers.filter((o) => o.track === "internship")),
+    internshipAccepted: reply("internship", "accepted"),
+    internshipRejected: reply("internship", "rejected"),
+    internshipExpired: reply("internship", "expired"),
+    internshipWithdrawn: reply("internship", "withdrawn"),
+    internshipWaiting: reply("internship", "pending"),
+    fullTimeAll: off(offers.filter((o) => o.track === "full_time")),
+    fullTimeAccepted: reply("full_time", "accepted"),
+    fullTimeRejected: reply("full_time", "rejected"),
+    fullTimeExpired: reply("full_time", "expired"),
+    fullTimeWithdrawn: reply("full_time", "withdrawn"),
+    fullTimeWaiting: reply("full_time", "pending"),
     offersExpired: off(offers.filter((o) => o.reply === "expired")),
     hiredFullTime: stu(hiredBy("full_time")),
     hiredInternship: stu(hiredBy("internship")),

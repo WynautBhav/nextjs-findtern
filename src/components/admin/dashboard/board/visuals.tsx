@@ -167,6 +167,61 @@ export function Versus({
   );
 }
 
+export type Part = { key: string; label: string; value: number; color: string; onOpen: () => void };
+
+/**
+ * A whole and its parts: the total (opens everyone), one stacked bar where every part is its share, and a legend of
+ * buttons with each count and share. Parts must add up to the total; a part with nothing in it stays in the legend at 0.
+ */
+export function Breakdown({ title, total, onOpenTotal, parts }: { title: string; total: number; onOpenTotal: () => void; parts: Part[] }) {
+  const sum = parts.reduce((s, p) => s + p.value, 0) || 1;
+  return (
+    <div className="min-w-0">
+      <div className="mb-2.5 flex items-baseline justify-between gap-3">
+        <span className="text-sm font-medium text-foreground">{title}</span>
+        <button
+          type="button"
+          onClick={onOpenTotal}
+          aria-label={`${title}: ${fmt(total)} in total. Open the list`}
+          className="inline-flex items-baseline gap-1.5 rounded-md text-xs text-text-subtle outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Total
+          <CountUp value={total} className="text-xl font-semibold text-foreground" />
+        </button>
+      </div>
+      <div role="img" aria-label={`${title}: ${parts.map((p) => `${p.label} ${p.value}`).join(", ")}`} className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-ink-100">
+        {total
+          ? parts.map((p) =>
+              p.value ? (
+                <span
+                  key={p.key}
+                  className="h-full transition-[width] duration-700 ease-out first:rounded-l-full last:rounded-r-full motion-reduce:transition-none"
+                  style={{ width: `${(p.value / sum) * 100}%`, minWidth: 6, background: p.color }}
+                />
+              ) : null,
+            )
+          : null}
+      </div>
+      <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5">
+        {parts.map((p) => (
+          <li key={p.key}>
+            <button
+              type="button"
+              onClick={p.onOpen}
+              className="inline-flex items-center gap-1.5 rounded text-sm text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+            >
+              <span className="size-2.5 rounded-full" style={{ background: p.color }} aria-hidden />
+              {p.label}
+              <span className="font-semibold tabular-nums">{fmt(p.value)}</span>
+              {total ? <span className="text-xs tabular-nums text-text-subtle">{Math.round((p.value / total) * 100)}%</span> : null}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export type DotGroup = { key: string; label: string; ids: string[]; color: string; onOpen: () => void };
 
 /**

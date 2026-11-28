@@ -157,3 +157,28 @@ test("pct: null on a zero base", () => {
   assert.equal(pct(1, 0), null);
   assert.equal(pct(1, 3), 33);
 });
+
+test("studentMetrics: each offer type splits its total into accepted, rejected, expired, withdrawn and waiting", () => {
+  const offers = [
+    offer("i1", "a", { reply: "accepted" }),
+    offer("i2", "a", { reply: "accepted" }),
+    offer("i3", "a", { reply: "rejected" }),
+    offer("i4", "a", { reply: "expired" }),
+    offer("i5", "a", { reply: "withdrawn" }),
+    offer("i6", "a", { reply: "pending" }),
+    offer("f1", "a", { track: "full_time", reply: "withdrawn" }),
+    offer("f2", "a", { track: "full_time", reply: "accepted" }),
+    offer("x1", "nobody", { reply: "accepted" }), // not one of the students: left out
+  ];
+  const m = studentMetrics({ students: [student("a")], offers, meetings: [], employers: [] });
+  assert.deepEqual(m.internshipAll.ids, ["i1", "i2", "i3", "i4", "i5", "i6"]);
+  assert.deepEqual(
+    [m.internshipAccepted.ids, m.internshipRejected.ids, m.internshipExpired.ids, m.internshipWithdrawn.ids, m.internshipWaiting.ids],
+    [["i1", "i2"], ["i3"], ["i4"], ["i5"], ["i6"]],
+  );
+  assert.deepEqual([m.fullTimeAll.ids, m.fullTimeWithdrawn.ids, m.fullTimeExpired.ids], [["f1", "f2"], ["f1"], []]);
+  for (const t of ["internship", "fullTime"] as const) {
+    const parts = (["Accepted", "Rejected", "Expired", "Withdrawn", "Waiting"] as const).reduce((s, k) => s + m[`${t}${k}`].ids.length, 0);
+    assert.equal(parts, m[`${t}All`].ids.length, `${t} parts add up to the total`);
+  }
+});

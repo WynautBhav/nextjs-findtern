@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 
 import { Metro, type Station } from "./metro";
 import { PeopleDrawer, type DrawerRow, type DrawerSpec } from "./people-drawer";
-import { BoardMotion, CountUp, DotField, FacePile, initials, Versus, type Face } from "./visuals";
+import { BoardMotion, Breakdown, CountUp, DotField, FacePile, initials, Versus, type Face } from "./visuals";
 
 
 const fmt = (n: number) => n.toLocaleString("en-IN");
@@ -261,6 +261,7 @@ const C_MAIN = "var(--color-brand-700)";
 const C_SOFT = "var(--color-brand-300)";
 const C_WAIT = "var(--color-accent-500)";
 const C_GREY = "var(--color-ink-300)";
+const C_INK = "var(--color-ink-600)";
 
 /** Ids in `a` that are not in `b`: the people waiting at a stop. */
 const minus = (a: MetricList, b: MetricList): MetricList => {
@@ -465,18 +466,34 @@ function StudentsView({ data, track, setTrack, open, links }: { data: DashboardB
 
         <Card title="Offers and meetings" sub="How students answered, every offer so far" className="lg:col-span-7">
           <div className="space-y-6">
-            <Versus
-              title="Internship proposals"
-              note={`${fmt(n(m.internshipAccepted) + n(m.internshipRejected))} decided`}
-              left={{ label: "Accepted", value: n(m.internshipAccepted), onOpen: () => open("Internship proposals accepted" + tag, m.internshipAccepted) }}
-              right={{ label: "Rejected", value: n(m.internshipRejected), onOpen: () => open("Internship proposals rejected" + tag, m.internshipRejected) }}
-            />
-            <Versus
-              title="Full-time offers"
-              note={`${fmt(n(m.fullTimeAccepted) + n(m.fullTimeRejected))} decided`}
-              left={{ label: "Accepted", value: n(m.fullTimeAccepted), onOpen: () => open("Full-time offers accepted" + tag, m.fullTimeAccepted) }}
-              right={{ label: "Rejected", value: n(m.fullTimeRejected), onOpen: () => open("Full-time offers rejected" + tag, m.fullTimeRejected) }}
-            />
+            {(
+              [
+                ["Internship proposals", "Internship proposals", "internship"],
+                ["Full-time offers", "Full-time offers", "fullTime"],
+              ] as const
+            ).map(([title, name, k]) => (
+              <Breakdown
+                key={k}
+                title={title}
+                total={n(m[`${k}All`])}
+                onOpenTotal={() => open(`${name}, all` + tag, m[`${k}All`])}
+                parts={(
+                  [
+                    ["Accepted", "accepted", C_MAIN],
+                    ["Rejected", "rejected", C_INK],
+                    ["Expired", "expired", C_WAIT],
+                    ["Withdrawn", "withdrawn", C_GREY],
+                    ["Waiting", "still waiting", C_SOFT],
+                  ] as const
+                ).map(([label, word, color]) => ({
+                  key: label,
+                  label,
+                  value: n(m[`${k}${label}`]),
+                  color,
+                  onOpen: () => open(`${name} ${word}` + tag, m[`${k}${label}`]),
+                }))}
+              />
+            ))}
             <Versus
               title="Meetings"
               note={`${fmt(n(m.meetsCompleted) + n(m.meetsExpired))} finished`}
