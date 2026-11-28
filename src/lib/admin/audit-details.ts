@@ -146,6 +146,7 @@ export function exportNoun(action: string, meta: Record<string, unknown>): strin
   if (action === "export.audit_log") return "audit log entries";
   if (action === "export.companies") return "companies";
   if (action === "export.projects") return "internship postings";
+  if (action === "export.meetings") return "meetings";
   if (action === "export.proposals") return "offers";
   if (action === "export.cgpa") return "CGPA checks";
   if (action === "export.payments") return "employer payments";
@@ -223,6 +224,7 @@ export function describeTarget(
     if (action === "export.hired") return { name: "Hired candidates", href: null };
     if (action === "export.companies") return { name: "Companies", href: "/admin/companies" };
     if (action === "export.projects") return { name: "Internship postings", href: "/admin/projects" };
+    if (action === "export.meetings") return { name: "Meetings", href: "/admin/meetings" };
     if (action === "export.proposals") return { name: "Offers", href: "/admin/proposal-tracker" };
     if (action === "export.cgpa") return { name: "CGPA checks", href: "/admin/cgpa-verifications" };
     if (action === "export.payments") return { name: "Employer payments", href: "/admin/orders" };

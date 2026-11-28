@@ -1,16 +1,17 @@
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { CODE_VERIFIED_BY } from "@/lib/intern-account";
 import { Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { flattenParams, parsePageRequest, toQueryString } from "@/lib/admin/params";
 import { isTestEmployer } from "@/lib/admin/scope";
-import { expiredCounts, expiredProposals, filterExpired, filterInterviews, filterProposals, headlineCount, ineligibleInterns, parseExpiredFilters, parseIstDay, proposalTimezone, upcomingInterviewCount, withTrueInterviewStatus, withTrueProposalStatus, type TrackerFilters } from "@/lib/admin/tracker";
+import { expiredCounts, expiredProposals, filterExpired, filterInterviews, filterProposals, headlineCount, ineligibleInterns, parseExpiredFilters, parseIstDay, proposalTimezone, withTrueInterviewStatus, withTrueProposalStatus, type TrackerFilters } from "@/lib/admin/tracker";
+import { acceptedPayOf, proposalPipelineStatus } from "@/lib/admin/proposal-pipeline";
+import { expiryOf } from "@/lib/proposal-expiry";
 import { loadExpiredSources } from "@/lib/admin/expired-load";
 import { cgpaBlocksPayment, proposalCgpaGate } from "@/lib/cgpa-verification";
 import { kickProposalExpiry } from "@/lib/proposal-expiry-kick";
 import { parseOffer } from "@/lib/offer";
-import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
 import { formatNumber } from "@/lib/format";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { DateRangeForm } from "@/components/admin/date-range-form";
@@ -20,10 +21,9 @@ import { isAiInterview } from "@/lib/admin/interview-notes";
 import { ButtonAnchor } from "@/components/ui/button";
 
 /**
- * Proposal pipeline (legacy admin-proposal-tracker.tsx): companies,
- * proposals, candidates, interviews and hires, all filtered by the same URL
- * (date range, exact company, exact candidate, timezone), so the figures and
- * the tables never disagree.
+ * Proposal pipeline: every sent proposal in one bucket (KPI cards that filter the records table), plus the by-candidate,
+ * by-company and expired-reason views, all filtered by the same URL (date range, exact company, exact candidate,
+ * timezone), so the figures and the tables never disagree. Interviews moved to the Meeting pipeline (/admin/meetings).
  */
 
 async function load() {
@@ -50,6 +50,7 @@ async function load() {
         createdAt: schema.proposals.createdAt,
         updatedAt: schema.proposals.updatedAt,
         hiredAt: schema.proposals.hiredAt,
+        interviewId: schema.proposals.interviewId,
         internId: schema.proposals.internId,
         internFirstName: schema.users.firstName,
         internLastName: schema.users.lastName,
@@ -65,6 +66,8 @@ async function load() {
       .leftJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
       .leftJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
       .leftJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
+      // Drafts were never sent: not in the pipeline, as on the dashboard.
+      .where(ne(schema.proposals.status, "draft"))
       .orderBy(desc(schema.proposals.createdAt)),
     db
       .select({
@@ -131,6 +134,11 @@ export default async function AdminProposalTrackerPage({
 }) {
   kickProposalExpiry(); // queued after the response; throttled to one sweep per 10 minutes
   const params = flattenParams(await searchParams);
+  // Old links: the Hired tab is now the Hired card of the main view; Interviews moved to the Meeting pipeline.
+  if (params.tab === "hired") {
+    params.tab = "proposals";
+    params.status = "hired";
+  }
   const tab: TrackerTab = (TRACKER_TABS as readonly string[]).includes(params.tab ?? "") ? (params.tab as TrackerTab) : "proposals";
   const filters: TrackerFilters = {
     from: parseIstDay(params.from),
@@ -144,21 +152,21 @@ export default async function AdminProposalTrackerPage({
     <AdminPageHeader
       title="Proposal pipeline"
       action={
-        <ButtonAnchor
-          href={
-            tab === "hired"
-              ? `/api/admin/export/hired${toQueryString({ ...params, tab: "", page: "", per: "" })}`
-              : tab === "expired"
+        tab === "expired" || tab === "candidates" || tab === "companies" ? (
+          <ButtonAnchor
+            href={
+              tab === "expired"
                 ? `/api/admin/expired${toQueryString({ ...params, type: "proposals", tab: "", page: "", per: "", sort: "", dir: "" })}`
                 : `/api/admin/export${toQueryString({ ...params, type: "proposals", tab: "", page: "", per: "" })}`
-          }
-          variant="outline"
-          size="sm"
-          className={ADMIN_PILL_SECONDARY}
-        >
-          <Download className="size-4" aria-hidden />
-          {tab === "hired" ? "Export hires" : tab === "expired" ? "Export expired" : "Export CSV"}
-        </ButtonAnchor>
+            }
+            variant="outline"
+            size="sm"
+            className={ADMIN_PILL_SECONDARY}
+          >
+            <Download className="size-4" aria-hidden />
+            {tab === "expired" ? "Export expired" : "Export CSV"}
+          </ButtonAnchor>
+        ) : undefined
       }
     />
   );
@@ -184,6 +192,7 @@ export default async function AdminProposalTrackerPage({
   // Every row carries its TRUE status (the shared proposal and interview rules), so nothing past its time reads Sent or
   // Scheduled before the sweep has run; the stored status rides along as `storedStatus` for the actions.
   const nowDate = new Date();
+  const interviewById = new Map(withTrueInterviewStatus(data.interviews, nowDate.getTime()).map((i) => [i.id, i]));
   // The CGPA gate is read off the true status, so an offer that already expired never carries a "verifying" marker. A full-time
   // acceptance is the hire itself and has no CGPA hold (the intern's own offer view skips it the same way).
   const realProposals = withTrueProposalStatus(data.proposals, nowDate, data.expiredSources.openOrderIds)
@@ -193,9 +202,21 @@ export default async function AdminProposalTrackerPage({
         p.status === "accepted" && !p.hiredAt && !parseOffer(p.offerDetails, p.currency).fullTime
           ? proposalCgpaGate({ status: p.status, extraData: data.cgpaByIntern.get(p.internId), offerDetails: p.offerDetails, updatedAt: p.updatedAt }, nowDate)
           : null;
-      return { ...p, cgpaGate: gate && cgpaBlocksPayment(gate) ? gate : null };
+      // One bucket per proposal (proposal-pipeline.ts), from the stored status and the same open-order freeze as the true status.
+      const rule = { status: p.storedStatus, hiredAt: p.hiredAt, offerDetails: p.offerDetails, currency: p.currency, hasOpenOrder: p.storedStatus === "accepted" && data.expiredSources.openOrderIds.has(p.id) };
+      const bucket = proposalPipelineStatus(rule, nowDate) ?? "pending"; // drafts are already left out by the query
+      const expiry = p.storedStatus === "withdrawn" ? ("withdrawn" as const) : expiryOf(rule, nowDate).reason;
+      const iv = p.interviewId ? interviewById.get(p.interviewId) : undefined;
+      return {
+        ...p,
+        bucket,
+        pay: acceptedPayOf(bucket, p.storedStatus),
+        expiryReason: bucket === "expired" || bucket === "withdrawn" ? expiry : null,
+        interview: iv ? { id: iv.id, status: iv.status, createdAt: iv.createdAt, slot: iv.selectedSlot === 1 ? iv.slot1 : iv.selectedSlot === 2 ? iv.slot2 : iv.selectedSlot === 3 ? iv.slot3 : null, timezone: iv.timezone, meetingLink: iv.meetingLink, isAi: iv.isAi } : null,
+        cgpaGate: gate && cgpaBlocksPayment(gate) ? gate : null,
+      };
     });
-  const realInterviews = withTrueInterviewStatus(data.interviews, nowDate.getTime()).filter((i) => !testIds.has(i.employerId));
+  const realInterviews = [...interviewById.values()].filter((i) => !testIds.has(i.employerId));
 
   const proposals = filterProposals(realProposals, filters);
   const interviews = filterInterviews(realInterviews, filters);
@@ -217,14 +238,8 @@ export default async function AdminProposalTrackerPage({
   for (const i of realInterviews) zones.add(i.timezone || "Asia/Kolkata");
   const tzOptions = [...zones].sort().map((z) => ({ value: z, label: z }));
 
-  const won = proposals.filter((p) => proposalOutcome(p.status) === "won").length;
-  const lost = proposals.filter((p) => proposalOutcome(p.status) === "lost").length;
-  const rate = acceptanceRate(won, lost);
-  const now = new Date().getTime();
-  const upcoming = upcomingInterviewCount(interviews, now);
   // Expired offers: on this tab the date range is the EXPIRY date (every other tab filters on when the offer was sent).
-  const expiredNow = new Date();
-  const expired = filterExpired(expiredProposals(data.expiredSources.rows, expiredNow, data.expiredSources.openOrderIds), { ...parseExpiredFilters(params), reason: "", q: "" });
+  const expired = filterExpired(expiredProposals(data.expiredSources.rows, nowDate, data.expiredSources.openOrderIds), { ...parseExpiredFilters(params), reason: "", q: "" });
   const expiredHeadline = headlineCount(expiredCounts(expired));
   const rangeLabel = filters.from || filters.to ? `${params.from ?? "start"} to ${params.to ?? "today"}` : "All time";
   const req = parsePageRequest(params);
@@ -233,26 +248,12 @@ export default async function AdminProposalTrackerPage({
     <div className="space-y-6">
       {header}
 
-      {/* Date range and the period's figures in one row; the four tiles
-          repeated the tab counts below (critique). */}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <DateRangeForm params={params} fromLabel={tab === "expired" ? "Expired from" : "From"} toLabel={tab === "expired" ? "Expired to" : "To"} />
-        {tab === "expired" ? (
-          <p className="nums pb-2 text-sm text-text-subtle">
-            <span className="font-medium text-foreground">{filters.from || filters.to ? `Expired ${rangeLabel}` : "All time"}</span>
-            {" · "}
-            {formatNumber(expiredHeadline)} expired
-          </p>
-        ) : (
-          <p className="nums pb-2 text-sm text-text-subtle">
-            <span className="font-medium text-foreground">{rangeLabel}</span>
-            {" · "}
-            {formatNumber(won)} accepted or hired
-            {rate === null ? "" : ` (${rate}% of decided offers, ${formatNumber(lost)} declined)`}
-            {" · "}
-            {upcoming ? `${formatNumber(upcoming)} interviews upcoming` : "no interviews upcoming"}
-          </p>
-        )}
+        <DateRangeForm params={params} fromLabel={tab === "expired" ? "Expired from" : "Sent from"} toLabel={tab === "expired" ? "Expired to" : "Sent to"} />
+        <p className="nums pb-2 text-sm text-text-subtle">
+          <span className="font-medium text-foreground">{tab === "expired" && (filters.from || filters.to) ? `Expired ${rangeLabel}` : rangeLabel}</span>
+          {tab === "expired" ? ` · ${formatNumber(expiredHeadline)} expired` : ""}
+        </p>
       </div>
 
       <ProposalTrackerView

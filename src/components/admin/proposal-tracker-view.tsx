@@ -1,95 +1,44 @@
 import Link from "next/link";
-import { CalendarX2 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { isHiredProposal } from "@/lib/hire-status";
 import { AdminTabs } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
-import { AdminEmpty, Panel, PanelHeader } from "@/components/admin/panel";
-import { ProposalPipelineLanes, type PipelineCard } from "@/components/admin/proposal-pipeline-lanes";
-import { SortSelect } from "@/components/admin/sort-select";
-import { TableToolbar } from "@/components/admin/table-toolbar";
-import { InterviewNotesButton, MeetingLinkCell } from "@/components/admin/proposal-tracker-dialogs";
+import { AdminEmpty, Panel } from "@/components/admin/panel";
+import { ProposalRecords, type PipelineItem } from "@/components/admin/proposal-pipeline-records";
 import { StatusBadge } from "@/components/admin/status-badge";
 import type { ToolbarFilter } from "@/components/admin/table-toolbar";
 import { toQueryString } from "@/lib/admin/params";
 import { daysSince } from "@/lib/admin/ai-interview-expiry";
 import { EXPIRED_REASONS, HEADLINE_REASONS, expiredCounts, filterExpired, headlineCount, matchesSearch, offerFacts, paginate, sortBy, type ExpiredRow } from "@/lib/admin/tracker";
 import { EXPIRY_LABEL, type ExpiryReason } from "@/lib/proposal-expiry";
-import { formatDate, formatDayLabel, formatIstStamp, formatMoney, formatNumber, formatSlotTime } from "@/lib/format";
+import { formatDate, formatIstStamp, formatMoney, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
-import type { CgpaGate } from "@/lib/cgpa-verification";
-import { parseOffer } from "@/lib/offer";
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
 
 /**
- * The proposal pipeline's five lists. Server-rendered from rows the page has
- * already filtered by date, company, candidate and timezone; this applies
- * the per-tab search, status filters, sort and page, all from the URL.
+ * The proposal pipeline's views. Server-rendered from rows the page has already filtered by date, company, candidate and
+ * timezone; each view applies its own search, filters, sort and page, all from the URL. The main view is the records
+ * table under the KPI cards (proposal-pipeline-records.tsx).
  */
 
-// Proposals first: the work itself; Companies is a rollup of it.
-export const TRACKER_TABS = ["proposals", "candidates", "interviews", "hired", "expired", "companies"] as const;
+// `interviews` stays a valid key so old links land on the "moved" note instead of the main view.
+export const TRACKER_TABS = ["proposals", "candidates", "companies", "expired", "interviews"] as const;
 export type TrackerTab = (typeof TRACKER_TABS)[number];
 
-type ProposalItem = {
-  id: string;
-  status: string;
-  /** What the database holds when `status` is the computed (true) one. */
-  storedStatus?: string;
-  flowType: string | null;
-  currency: string | null;
-  offerDetails: unknown;
-  createdAt: Date | null;
-  hiredAt: Date | null;
-  internId: string;
-  internFirstName: string | null;
-  internLastName: string | null;
-  internEmail: string | null;
-  internPhone: string | null;
-  employerId: string;
-  companyName: string | null;
-  projectId: string;
-  projectName: string | null;
-  projectTimezone: string | null;
-  /** Set only while the intern's CGPA check holds this accepted offer's payment (derived on the page, from the true status). */
-  cgpaGate?: CgpaGate | null;
-};
+type ProposalItem = PipelineItem;
 
-type InterviewItem = {
-  id: string;
-  status: string;
-  /** From the shared interview lifecycle: why a row reads Expired. */
-  lifecycle?: { reason: string | null };
-  slot1: Date | null;
-  slot2: Date | null;
-  slot3: Date | null;
-  selectedSlot: number | null;
-  timezone: string | null;
-  meetingLink: string | null;
-  notes: string | null;
-  createdAt: Date | null;
-  internId: string;
-  internFirstName: string | null;
-  internLastName: string | null;
-  internEmail: string | null;
-  employerId: string;
-  companyName: string | null;
-  projectId: string | null;
-  projectName: string | null;
-  isAi: boolean;
-};
+type InterviewItem = { employerId: string };
 
 type EmployerItem = { id: string; companyName: string; companyEmail: string; city: string | null; country: string | null; isActive: boolean };
 type Option = { value: string; label: string };
 
 const BASE = "/admin/proposal-tracker";
-const FINISHED_INTERVIEW = ["completed", "expired", "cancelled", "canceled"];
 
 const nameOf = (r: { internFirstName: string | null; internLastName: string | null; internEmail: string | null }) =>
   `${r.internFirstName ?? ""} ${r.internLastName ?? ""}`.trim() || r.internEmail || "Candidate";
 const time = (d: Date | null) => (d ? d.getTime() : null);
-const chosenSlot = (i: InterviewItem) => (i.selectedSlot === 1 ? i.slot1 : i.selectedSlot === 2 ? i.slot2 : i.selectedSlot === 3 ? i.slot3 : null);
 
 export function ProposalTrackerView({
   tab,
@@ -118,18 +67,15 @@ export function ProposalTrackerView({
   expired: ExpiredRow[];
   options: { companies: Option[]; interns: Option[]; timezones: Option[] };
 }) {
-  const hired = proposals.filter((p) => isHiredProposal(p));
   const candidateIds = new Set(proposals.map((p) => p.internId));
   const activeCompanies = employers.filter((e) => proposals.some((p) => p.employerId === e.id) || interviews.some((i) => i.employerId === e.id));
 
   const tabs: { key: TrackerTab; label: string; count: number }[] = [
     { key: "proposals", label: "Proposals", count: proposals.length },
-    { key: "candidates", label: "Candidates", count: candidateIds.size },
-    { key: "interviews", label: "Interviews", count: interviews.length },
-    { key: "hired", label: "Hired", count: hired.length },
+    { key: "candidates", label: "By candidate", count: candidateIds.size },
+    { key: "companies", label: "By company", count: activeCompanies.length },
     // Headline = the three offers that lapsed on their own; closures by a person are chips inside the tab.
-    { key: "expired", label: "Expired", count: headlineCount(expiredCounts(expired)) },
-    { key: "companies", label: "Companies", count: activeCompanies.length },
+    { key: "expired", label: "Expired reasons", count: headlineCount(expiredCounts(expired)) },
   ];
 
   // Shared pickers (ADP-12): exact company, exact candidate, timezone.
@@ -143,18 +89,35 @@ export function ProposalTrackerView({
 
   return (
     <div className="space-y-4">
-      <AdminTabs
-        label="Pipeline view"
-        items={tabs.map((t) => ({ ...t, href: `${BASE}${toQueryString({ ...keep, tab: t.key })}` }))}
-        active={tab}
-      />
+      <div className="flex flex-col gap-x-6 gap-y-1 xl:flex-row xl:items-end xl:justify-between">
+        <AdminTabs
+          label="Pipeline view"
+          className="min-w-0 xl:flex-1"
+          items={tabs.map((t) => ({ ...t, href: `${BASE}${toQueryString({ ...keep, tab: t.key === "proposals" ? "" : t.key })}` }))}
+          active={tab}
+        />
+        <Link
+          href="/admin/meetings"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-sm font-medium text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          Meetings moved to Meeting pipeline
+          <ArrowRight className="size-4" aria-hidden />
+        </Link>
+      </div>
 
+      {tab === "proposals" ? <ProposalRecords {...{ params, page, perPage, search, pickers }} rows={proposals} /> : null}
       {tab === "companies" ? <CompaniesTab {...{ params, page, perPage, search, pickers, proposals, interviews }} employers={activeCompanies} /> : null}
-      {tab === "proposals" ? <ProposalsTab {...{ params, search, pickers }} rows={proposals} /> : null}
       {tab === "candidates" ? <CandidatesTab {...{ params, page, perPage, search, pickers, proposals, noGuarantee }} /> : null}
-      {tab === "interviews" ? <InterviewsTab {...{ params, page, perPage, search, pickers }} rows={interviews} /> : null}
-      {tab === "hired" ? <HiredTab {...{ params, page, perPage, search, pickers }} rows={hired} /> : null}
       {tab === "expired" ? <ExpiredTab {...{ params, page, perPage, search, pickers }} rows={expired} /> : null}
+      {tab === "interviews" ? (
+        <Panel>
+          <AdminEmpty
+            title="Meetings moved to Meeting pipeline"
+            body="Interviews and meetings now have their own page, with the same company and candidate filters."
+            action={{ href: "/admin/meetings", label: "Open Meeting pipeline" }}
+          />
+        </Panel>
+      ) : null}
     </div>
   );
 }
@@ -196,7 +159,7 @@ function CompaniesTab({
   const sort = parseSort(params, ["name", "proposals", "interviews", "hired", "rate"] as const, { key: "proposals", dir: "desc" });
   const sorted = sortBy(rows, (r) => (sort.key === "name" ? r.companyName.toLowerCase() : r[sort.key]), sort.dir);
   const pg = paginate(sorted, page, perPage);
-  const q = (company: string, tab: TrackerTab) => `${BASE}${toQueryString({ from: params.from ?? "", to: params.to ?? "", company, tab })}`;
+  const q = (company: string) => `${BASE}${toQueryString({ from: params.from ?? "", to: params.to ?? "", company })}`;
 
   return (
     <DataTable
@@ -228,7 +191,7 @@ function CompaniesTab({
           sort: "proposals",
           align: "right",
           cell: (r) => (
-            <Link href={q(r.id, "proposals")} className="font-medium hover:underline">
+            <Link href={q(r.id)} className="font-medium hover:underline">
               {r.proposals}
             </Link>
           ),
@@ -237,11 +200,8 @@ function CompaniesTab({
           header: "Interviews",
           sort: "interviews",
           align: "right",
-          cell: (r) => (
-            <Link href={q(r.id, "interviews")} className="font-medium hover:underline">
-              {r.interviews}
-            </Link>
-          ),
+          // Meetings live on the Meeting pipeline now; the count stays for the company's picture.
+          cell: (r) => r.interviews,
         },
         { header: "Accepted or hired", align: "right", cell: (r) => r.won },
         { header: "Hired", sort: "hired", align: "right", cell: (r) => r.hired },
@@ -250,121 +210,6 @@ function CompaniesTab({
         { header: "Account", cell: (r) => <StatusBadge value={r.isActive ? "active" : "inactive"} /> },
       ]}
     />
-  );
-}
-
-function ProposalsTab({ params, search, pickers, rows }: Pick<TabProps, "params" | "search" | "pickers"> & { rows: ProposalItem[] }) {
-  const filtered = rows.filter((p) => {
-    const offer = parseOffer(p.offerDetails, p.currency);
-    return (
-      matchesSearch([nameOf(p), p.internEmail, p.companyName, p.projectName, offer.roleTitle], search) &&
-      (!params.status || p.status === params.status) &&
-      (!params.flow || p.flowType === params.flow) &&
-      (!params.kind || (params.kind === "fulltime" ? Boolean(offer.fullTime) : !offer.fullTime))
-    );
-  });
-  const sort = parseSort(params, ["candidate", "company", "start", "sent"] as const, { key: "sent", dir: "desc" });
-  const sorted = sortBy(
-    filtered,
-    (p) =>
-      sort.key === "candidate"
-        ? nameOf(p).toLowerCase()
-        : sort.key === "company"
-          ? (p.companyName ?? "").toLowerCase()
-          : sort.key === "start"
-            ? parseOffer(p.offerDetails, p.currency).startDate
-            : time(p.createdAt),
-    sort.dir,
-  );
-  const filtersOn = Boolean(search || params.status || params.flow || params.kind || params.company || params.intern || params.tz);
-
-  const cards: PipelineCard[] = sorted.map((p) => {
-    const o = parseOffer(p.offerDetails, p.currency);
-    const flow = p.flowType === "interview_first" ? "Interview first" : "Direct offer";
-    const value = o.fullTime ? o.fullTime.annualCtcMinor : (o.totalMinor ?? (o.monthlyMinor != null ? o.monthlyMinor * o.months : null));
-    return {
-      id: p.id,
-      status: p.status,
-      internId: p.internId,
-      name: nameOf(p),
-      email: p.internEmail,
-      employerId: p.employerId,
-      company: p.companyName ?? "Company",
-      project: p.projectName ?? "Project",
-      flow,
-      fullTimeHired: isHiredProposal(p) && Boolean(o.fullTime),
-      cgpaVerifying: p.cgpaGate ? { acceptedAt: p.cgpaGate.acceptedAt, correction: p.cgpaGate.state === "incorrect_unacked" } : null,
-      amount: o.fullTime
-        ? `${o.fullTime.annualCtcMinor != null ? formatMoney(o.fullTime.annualCtcMinor, o.currency) : "-"} CTC`
-        : o.monthlyMinor != null
-          ? `${formatMoney(o.monthlyMinor, o.currency)}/mo`
-          : "-",
-      amountSub: o.fullTime ? "Full-time" : `${o.months} mo internship`,
-      valueMinor: value,
-      currency: o.currency,
-      startLabel: formatDate(o.startDate),
-      sentLabel: `Sent ${formatDayLabel(p.createdAt)}`,
-      details: {
-        id: p.id,
-        // The stored status drives the override editor; `shownStatus` is the true one the badge prints.
-        status: p.storedStatus ?? p.status,
-        shownStatus: p.status,
-        currency: p.currency,
-        offerDetails: p.offerDetails,
-        candidate: nameOf(p),
-        companyName: p.companyName ?? "Company",
-        projectName: p.projectName ?? "Project",
-        flow,
-        sentAt: formatDate(p.createdAt),
-      },
-    };
-  });
-
-  const statusOptions = [
-    { value: "sent", label: "Sent" },
-    { value: "interview_scheduled", label: "Interview scheduled" },
-    { value: "accepted", label: "Accepted" },
-    { value: "processing", label: "Processing" },
-    { value: "hired", label: "Hired" },
-    { value: "rejected", label: "Rejected" },
-    { value: "expired", label: "Expired" },
-    { value: "withdrawn", label: "Withdrawn" },
-  ];
-  const filters: ToolbarFilter[] = [
-    ...pickers,
-    { key: "status", label: "Status", options: statusOptions },
-    { key: "flow", label: "Flow", options: [{ value: "direct", label: "Direct offer" }, { value: "interview_first", label: "Interview first" }] },
-    { key: "kind", label: "Offer type", options: [{ value: "internship", label: "Internship" }, { value: "fulltime", label: "Full-time" }] },
-  ];
-  const sortOptions = [
-    { value: "sent", label: "Sent" },
-    { value: "candidate", label: "Candidate" },
-    { value: "company", label: "Company" },
-    { value: "start", label: "Start date" },
-  ];
-  const empty = filtersOn
-    ? filteredEmpty(params, "proposals")
-    : { title: "No proposals yet", body: "Offers appear here the moment a company sends one." };
-
-  return (
-    <Panel>
-      <PanelHeader
-        title="Proposals by stage"
-        description={`${filtered.length.toLocaleString("en-IN")} ${filtered.length === 1 ? "proposal" : "proposals"}${filtersOn ? " match these filters" : " in this period"}. Scroll sideways for later stages.`}
-      />
-      <div className="px-[var(--admin-pad-panel)] pt-3 pb-4">
-        <TableToolbar
-          searchPlaceholder="Search candidate, company, project, role…"
-          filters={filters}
-          extra={<SortSelect options={sortOptions} className="max-sm:w-full" />}
-        />
-      </div>
-      {cards.length === 0 ? (
-        <AdminEmpty {...empty} />
-      ) : (
-        <ProposalPipelineLanes cards={cards} params={params} basePath={BASE} />
-      )}
-    </Panel>
   );
 }
 
@@ -427,225 +272,12 @@ function CandidatesTab({ params, page, perPage, search, pickers: basePickers, pr
   );
 }
 
-function InterviewsTab({ params, page, perPage, search, pickers, rows }: TabProps & { rows: InterviewItem[] }) {
-  const filtered = rows.filter(
-    (i) => matchesSearch([nameOf(i), i.internEmail, i.companyName, i.projectName], search) && (!params.status || i.status === params.status),
-  );
-  const sort = parseSort(params, ["candidate", "slot", "created"] as const, { key: "created", dir: "desc" });
-  const sorted = sortBy(
-    filtered,
-    (i) => (sort.key === "candidate" ? nameOf(i).toLowerCase() : sort.key === "slot" ? time(chosenSlot(i) ?? i.slot1) : time(i.createdAt)),
-    sort.dir,
-  );
-  const pg = paginate(sorted, page, perPage);
-
-  return (
-    <DataTable
-      basePath={BASE}
-      params={params}
-      page={pg.page}
-      pages={pg.pages}
-      total={pg.total}
-      perPage={perPage}
-      rows={pg.rows}
-      noun="interviews"
-      caption="Interviews"
-      searchPlaceholder="Search candidate, company, project…"
-      filters={[
-        ...pickers,
-        {
-          key: "status",
-          label: "Status",
-          options: [
-            { value: "pending", label: "Pending" },
-            { value: "scheduled", label: "Scheduled" },
-            { value: "completed", label: "Completed" },
-            { value: "missed", label: "Missed" },
-            { value: "expired", label: "Expired" },
-            { value: "cancelled", label: "Cancelled" },
-          ],
-        },
-      ]}
-      empty={search || params.status || params.company || params.intern || params.tz ? filteredEmpty(params, "interviews") : { title: "No interviews yet", body: "Interviews appear here once a company proposes slots to a candidate." }}
-      columns={[
-        {
-          header: "Candidate",
-          sort: "candidate",
-          cell: (i) => (
-            <IdentityCell name={nameOf(i)} id={i.internId} href={`/admin/interns/${i.internId}`} sub={i.internEmail ?? "-"} size="sm" className="max-w-64" />
-          ),
-        },
-        {
-          header: "Company and project",
-          cell: (i) => (
-            <div className="min-w-0 max-w-60">
-              <Link href={`/admin/companies/${i.employerId}?tab=interviews`} className="block truncate font-medium text-foreground hover:underline">
-                {i.companyName ?? "Company"}
-              </Link>
-              <p className="truncate text-xs text-text-subtle">{i.projectName ?? "No project"}</p>
-            </div>
-          ),
-        },
-        {
-          header: "Slot",
-          sort: "slot",
-          cell: (i) => {
-            const chosen = chosenSlot(i);
-            const tz = i.timezone || "Asia/Kolkata";
-            if (chosen) {
-              return (
-                <div className="whitespace-nowrap">
-                  <p className="nums font-medium text-foreground">{formatSlotTime(chosen, tz)}</p>
-                  <p className="text-xs text-text-subtle">{tz} · picked slot {i.selectedSlot}</p>
-                </div>
-              );
-            }
-            const offered = [i.slot1, i.slot2, i.slot3].filter((s): s is Date => Boolean(s));
-            return offered.length ? (
-              <div className="whitespace-nowrap">
-                <ul className="nums space-y-0.5 text-foreground">
-                  {offered.map((s, n) => (
-                    <li key={n}>{formatSlotTime(s, tz)}</li>
-                  ))}
-                </ul>
-                <p className="text-xs text-text-subtle">{tz} · not picked yet</p>
-              </div>
-            ) : (
-              <span className="text-text-subtle">No slot offered</span>
-            );
-          },
-        },
-        {
-          // Created rides under the status (its own column pushed the table past 1440).
-          header: "Status",
-          sort: "created",
-          cell: (i) => (
-            <div className="flex flex-col items-start gap-1">
-              <StatusBadge value={i.status} icon={i.status === "expired" ? <CalendarX2 /> : undefined} />
-              {i.status === "expired" && i.lifecycle?.reason ? <span className="text-xs text-text-subtle">{i.lifecycle.reason}</span> : null}
-              <span className="nums whitespace-nowrap text-xs text-text-subtle">requested {formatDate(i.createdAt)}</span>
-            </div>
-          ),
-        },
-        {
-          header: "Meeting link",
-          cell: (i) => <MeetingLinkCell interviewId={i.id} link={i.meetingLink} locked={FINISHED_INTERVIEW.includes(i.status.toLowerCase())} awaitingSlot={!i.isAi && !i.selectedSlot} />,
-        },
-        {
-          header: "",
-          cell: (i) => (i.notes?.trim() ? <InterviewNotesButton title={`${nameOf(i)} · ${i.companyName ?? "Company"}`} notes={i.notes} /> : null),
-        },
-      ]}
-    />
-  );
-}
-
 /** "View proposal" on a table row: the read-only proposal page (same read permission as this pipeline). */
 function ViewProposalLink({ id }: { id: string }) {
   return (
     <Link href={`/admin/proposal-tracker/${encodeURIComponent(id)}`} className="whitespace-nowrap text-sm font-medium text-brand-700 hover:underline max-lg:inline-flex max-lg:min-h-11 max-lg:items-center">
       View proposal
     </Link>
-  );
-}
-
-function HiredTab({ params, page, perPage, search, pickers, rows }: TabProps & { rows: ProposalItem[] }) {
-  const filtered = rows.filter((p) => {
-    const offer = parseOffer(p.offerDetails, p.currency);
-    return (
-      matchesSearch([nameOf(p), p.internEmail, p.internPhone, p.companyName, p.projectName, offer.roleTitle], search) &&
-      (!params.kind || (params.kind === "fulltime" ? Boolean(offer.fullTime) : !offer.fullTime))
-    );
-  });
-  const sort = parseSort(params, ["candidate", "company", "start", "hired"] as const, { key: "hired", dir: "desc" });
-  const sorted = sortBy(
-    filtered,
-    (p) =>
-      sort.key === "candidate"
-        ? nameOf(p).toLowerCase()
-        : sort.key === "company"
-          ? (p.companyName ?? "").toLowerCase()
-          : sort.key === "start"
-            ? parseOffer(p.offerDetails, p.currency).startDate
-            : time(p.hiredAt ?? p.createdAt),
-    sort.dir,
-  );
-  const pg = paginate(sorted, page, perPage);
-  const fullTime = rows.filter((p) => parseOffer(p.offerDetails, p.currency).fullTime).length;
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-text-subtle">
-        <span className="nums font-medium text-foreground">{rows.length}</span> hired: <span className="nums">{rows.length - fullTime}</span> internship,{" "}
-        <span className="nums">{fullTime}</span> full-time. Export downloads exactly the rows this filter shows.
-      </p>
-      <DataTable
-        basePath={BASE}
-        params={params}
-        page={pg.page}
-        pages={pg.pages}
-        total={pg.total}
-        perPage={perPage}
-        rows={pg.rows}
-        noun="hires"
-        caption="Hired candidates"
-        searchPlaceholder="Search candidate, company, project, role…"
-        filters={[...pickers, { key: "kind", label: "Type", allLabel: "Internship and full-time", options: [{ value: "internship", label: "Internship" }, { value: "fulltime", label: "Full-time" }] }]}
-        empty={search || params.kind || params.company || params.intern || params.tz ? filteredEmpty(params, "hired") : { title: "No hires yet", body: "A candidate shows here once the company has paid for an accepted offer." }}
-        columns={[
-          {
-            header: "Candidate",
-            sort: "candidate",
-            cell: (p) => (
-              <IdentityCell name={nameOf(p)} id={p.internId} href={`/admin/interns/${p.internId}`} sub={p.internEmail ?? "-"} size="sm" className="max-w-64" />
-            ),
-          },
-          {
-            header: "Company and project",
-            sort: "company",
-            cell: (p) => (
-              <div className="min-w-0 max-w-60">
-                <Link href={`/admin/companies/${p.employerId}?tab=hired`} className="block truncate font-medium text-foreground hover:underline">
-                  {p.companyName ?? "Company"}
-                </Link>
-                <p className="truncate text-xs text-text-subtle">{p.projectName ?? "Project"}</p>
-              </div>
-            ),
-          },
-          {
-            header: "Role",
-            cell: (p) => {
-              const o = parseOffer(p.offerDetails, p.currency);
-              return (
-                <div className="min-w-0 max-w-52">
-                  <p className="truncate">{o.roleTitle || "-"}</p>
-                  <p className="text-xs text-text-subtle">{o.fullTime ? "Full-time" : `Internship · ${o.months} mo`}</p>
-                </div>
-              );
-            },
-          },
-          {
-            header: "Pay",
-            align: "right",
-            cell: (p) => {
-              const o = parseOffer(p.offerDetails, p.currency);
-              return (
-                <span className="whitespace-nowrap">
-                  {o.fullTime
-                    ? `${o.fullTime.annualCtcMinor != null ? formatMoney(o.fullTime.annualCtcMinor, o.currency) : "-"} CTC`
-                    : o.monthlyMinor != null
-                      ? `${formatMoney(o.monthlyMinor, o.currency)}/mo`
-                      : "-"}
-                </span>
-              );
-            },
-          },
-          { header: "Start", sort: "start", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(parseOffer(p.offerDetails, p.currency).startDate)}</span> },
-          { header: "Hired on", sort: "hired", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.hiredAt ?? p.createdAt)}</span> },
-          { header: "", cell: (p) => <ViewProposalLink id={p.id} /> },
-        ]}
-      />
-    </div>
   );
 }
 

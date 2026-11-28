@@ -12,7 +12,7 @@ import { todayIstIso } from "@/lib/admin/intern-list";
 import { buildXlsx, XLSX_MIME } from "@/lib/xlsx";
 import { flattenParams, parsePageRequest, periodStart, searchAny } from "@/lib/admin/params";
 import { allows, BANK_EXPORT_PERMISSIONS, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
-import { activeProject, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { LUT_NUMBER, placeOfSupply, sellerStateCode, splitGst } from "@/lib/gst";
 import { formatIstStamp } from "@/lib/format";
 import { placeLabel } from "@/lib/invoice";
@@ -23,6 +23,8 @@ import { orderReview } from "@/lib/payment-flags";
 import { paymentPromo } from "@/lib/admin/payment-promo";
 import { filterProposals, matchesSearch, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
 import { parseOffer } from "@/lib/offer";
+import { EXPORT_MAX_ROWS, loadProjectsExport } from "@/lib/admin/projects-board";
+import { MODE_LABEL, payLines, projectStatus } from "@/lib/admin/projects-board-pure";
 
 import { getSession } from "@/lib/auth";
 
@@ -218,52 +220,27 @@ async function exportCompanies(search: string, params: Record<string, string>, a
   return csvResponse(toCsv(rows, columns), csvFilename("companies"));
 }
 
-async function exportProjects(search: string, params: Record<string, string>, adminId: string) {
-  const db = getDb();
-
-  const conditions: (SQL | undefined)[] = [
-    searchAny(
-      [sql`${schema.projects.projectName}`, sql`${schema.employers.companyName}`],
-      search,
-    ),
-    realEmployerId(schema.projects.employerId),
-    // Same rule as the projects list: blank status is active; closed covers
-    // legacy "inactive" and "archived" (ADP-13).
-    params.status === "active" ? activeProject() : params.status === "closed" ? sql`not ${activeProject()}` : params.status ? eq(schema.projects.status, params.status) : undefined,
-    params.ft === "yes" ? eq(schema.projects.fullTimeOffer, true) : undefined,
-    params.ft === "no" ? eq(schema.projects.fullTimeOffer, false) : undefined,
-  ].filter(Boolean) as SQL[];
-
-  const where = conditions.length
-    ? sql`${conditions.reduce((acc, c) => sql`${acc} and ${c}`)}`
-    : undefined;
-
-  const rows = await db
-    .select({
-      projectName: schema.projects.projectName,
-      companyName: schema.employers.companyName,
-      status: schema.projects.status,
-      fullTimeOffer: schema.projects.fullTimeOffer,
-      locationType: schema.projects.locationType,
-      city: schema.projects.city,
-      skills: schema.projects.skills,
-      createdAt: schema.projects.createdAt,
-    })
-    .from(schema.projects)
-    .innerJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
-    .where(where)
-    .orderBy(desc(schema.projects.createdAt))
-    .limit(MAX_ROWS);
+async function exportProjects(_search: string, params: Record<string, string>, adminId: string) {
+  // The Projects page's own loader (every filter and the company sort, unpaged), so the file holds the rows on screen.
+  const rows = await loadProjectsExport(params);
+  if (!rows) return new NextResponse(`More than ${EXPORT_MAX_ROWS.toLocaleString("en-IN")} projects match; narrow the filters.`, { status: 400 });
 
   const columns: CsvColumn<(typeof rows)[number]>[] = [
-    { header: "Project", value: (r) => r.projectName },
     { header: "Company", value: (r) => r.companyName },
-    { header: "Status", value: (r) => r.status ?? "" },
-    { header: "Full-time", value: (r) => (r.fullTimeOffer ? "yes" : "no") },
-    { header: "Location type", value: (r) => r.locationType ?? "" },
-    { header: "City", value: (r) => r.city ?? "" },
-    { header: "Skills", value: (r) => (r.skills ?? []).join("; ") },
+    { header: "Project", value: (r) => r.name },
+    { header: "Skills", value: (r) => r.skills.join("; ") },
+    { header: "City", value: (r) => r.city },
+    { header: "State", value: (r) => r.state },
+    { header: "Preferred locations", value: (r) => r.preferredLocations.join("; ") },
+    { header: "Work mode", value: (r) => MODE_LABEL[r.locationType] ?? r.locationType },
+    { header: "Engagement", value: (r) => (r.fullTimeOffer ? "Full-time" : "Internship") },
+    { header: "Pay", value: (r) => payLines(r.pay).join("; ") || "No offers yet" },
+    { header: "Scope of work", value: (r) => r.scope },
+    { header: "Status", value: (r) => projectStatus(r).label },
+    { header: "Deactivation reason", value: (r) => (r.takenDownAt ? (r.takenDownReason ?? "") : "") },
     { header: "Posted (IST)", value: (r) => formatIstStamp(r.createdAt) },
+    { header: "Offers sent", value: (r) => r.offersSent },
+    { header: "Hires", value: (r) => r.hires },
   ];
 
   const refused = await auditExport(adminId, "export.projects", "project", rows.length, params);

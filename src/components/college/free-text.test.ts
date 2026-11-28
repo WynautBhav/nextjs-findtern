@@ -38,7 +38,7 @@ const PLACES: [file: string, expr: string][] = [
   ["components/employer/takedown-banner.tsx", "{p.reason}</span>"],
   ["app/employer/projects/project-list.tsx", "{p.takenDownReason || \"No reason was recorded.\"}"],
   ["app/employer/projects/project-list.tsx", "{p.rejectionReason}</p>"],
-  ["app/admin/projects/page.tsx", "{row.takenDownReason}</p>"],
+  ["app/admin/projects/projects-board.tsx", "{p.takenDownReason || \"No reason saved\"}</p>"],
 ];
 
 for (const [file, expr] of PLACES) {

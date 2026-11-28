@@ -32,7 +32,15 @@ export function realEmployerId(col: SQLWrapper): SQL {
 
 /** Only live postings count as active: published, or the legacy 'active' (an empty status is legacy active). Drafts, review, paused, rejected and closed do not. */
 export function activeProject(): SQL {
-  return sql`coalesce(nullif(lower(${schema.projects.status}), ''), 'active') IN ('active', 'published')`;
+  return sql`coalesce(nullif(lower(${trimmedStatus()}), ''), 'active') IN ('active', 'published')`;
+}
+
+/**
+ * projects.status with surrounding whitespace (spaces, tabs, newlines) removed, as JS `trim()` does in lifecycle.ts
+ * isOpenProject; plain SQL trim() only strips spaces, so a padded "active " or "Published\n" read differently.
+ */
+export function trimmedStatus(): SQL {
+  return sql`regexp_replace(${schema.projects.status}, '^[[:space:]]+|[[:space:]]+$', '', 'g')`;
 }
 
 /** Open to candidates: an active project not taken down by Findtern (pure twin: projects/lifecycle isOpenProject). Admin counts use this. */
@@ -49,6 +57,19 @@ export { toInrMinor } from "./money";
 export function hiredWhere(t: string): SQL {
   const a = sql.identifier(t);
   return sql`(lower(${a}.status) IN (${sql.join(HIRED_STATUSES.map((s) => sql`${s}`), sql`, `)}) OR ${a}.hired_at IS NOT NULL)`;
+}
+
+/**
+ * Accepted and waiting on the employer's payment, for the proposals table: status accepted, not hired, and its start day
+ * (India time) not begun yet. Past that day the offer is Expired, not waiting (proposal-expiry.ts acceptedUnpaidExpired).
+ * SQL twin of the Proposal pipeline's "Accepted · waiting on payment" (proposal-pipeline.ts acceptedPayOf "unpaid"); the
+ * sidebar badge and the dashboard's accepted queue count this set. One known gap: an offer past its start day with an employer
+ * order open in its 30-minute checkout window stays accepted on the page (the open order freezes expiry) but is left out here.
+ */
+export function acceptedUnpaidWhere(): SQL {
+  const p = schema.proposals;
+  const day = sql`left(${p.offerDetails}->>'startDate', 10)`;
+  return sql`(${p.status} = 'accepted' AND ${p.hiredAt} IS NULL AND NOT coalesce(${day} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' AND ${day} <= to_char(now() AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD'), false))`;
 }
 
 /** The student said yes (lib/proposals proposalOutcome "won"), for a proposals table under alias `t`. */

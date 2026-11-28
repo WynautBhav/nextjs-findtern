@@ -2,7 +2,7 @@
  * The admin dashboard's rows (Students | Employers | Colleges). Read-only. The numbers themselves are computed from
  * these rows in `dashboard-board-pure.ts`, so every count is the length of the list it opens. Each row reuses the
  * app's own rules: aiInterviewStatus, the admin's complete-profile set, the AI-link queue's paid flag, the CGPA queue
- * status, meetOutcome, isHiredProposal, parseOffer and guaranteeState.
+ * status, meetingStage, isHiredProposal, parseOffer and guaranteeState.
  */
 import { sql } from "drizzle-orm";
 
@@ -11,7 +11,7 @@ import { aiInterviewStatus, findternScoreSql, realEmployers } from "@/lib/admin/
 import { loadCompleteProfileIds } from "@/lib/admin/profile-state-load";
 import { profileCompletion } from "@/lib/onboarding";
 import { profileDocsOf } from "@/lib/admin/profile-state";
-import { meetOutcome, MEET_STAGE } from "@/lib/college/meet-outcome";
+import { loadMeetings } from "@/lib/admin/meetings-load";
 import { isHiredProposal } from "@/lib/hire-status";
 import { getAccountType } from "@/lib/intern-account";
 import { parseOffer } from "@/lib/offer";
@@ -21,7 +21,6 @@ import { loadAiLinkRows } from "@/lib/admin/ai-link-queue-load";
 import {
   isIndianEmployer,
   offerReplyOf,
-  meetingDetail,
   trackOf,
   type BoardEmployer,
   type BoardMeeting,
@@ -41,7 +40,7 @@ export async function loadDashboardBoard(now: Date = new Date()) {
   const NOW = now.getTime();
   const ex = <T,>(q: ReturnType<typeof sql>) => db.execute(q).then((r) => r.rows as T[]);
 
-  const [internsRaw, onboardingRows, docs, memberships, completeIds, aiLinks, proposals, meetingsRaw, employersRaw, driveJoins, collegesRaw] = await Promise.all([
+  const [internsRaw, onboardingRows, docs, memberships, completeIds, aiLinks, proposals, meetingsLoaded, employersRaw, driveJoins, collegesRaw] = await Promise.all([
     ex<Record<string, unknown>>(sql`
       SELECT "users".id, "users".first_name, "users".last_name, "users".email, "users".country_code, "users".phone_number, "users".created_at,
              ${aiInterviewStatus()} AS ai_status, ${findternScoreSql()} AS score,
@@ -67,11 +66,8 @@ export async function loadDashboardBoard(now: Date = new Date()) {
         FROM proposals pr JOIN ${schema.employers} ON ${schema.employers.id} = pr.employer_id
        WHERE pr.status <> 'draft' AND ${realEmployers()}
        ORDER BY pr.created_at DESC`),
-    // Employer meetings (not the AI interview, which sits under the test employer).
-    ex<Record<string, unknown>>(sql`
-      SELECT i.id, i.intern_id, i.employer_id, i.status, i.selected_slot, i.slot1, i.slot2, i.slot3, i.cancelled_by, i.cancel_reason, i.notes, ${schema.employers.companyName} AS company_name
-        FROM interviews i JOIN ${schema.employers} ON ${schema.employers.id} = i.employer_id
-       WHERE ${realEmployers()}`),
+    // Employer meetings and drive calls, each with its one stage: the same rows /admin/meetings counts.
+    loadMeetings(now),
     ex<Record<string, unknown>>(sql`
       SELECT id, company_name, name, company_email, country_code, phone_number, city, country, company_size, international_fte_status, created_at, onboarding_completed
         FROM ${schema.employers} WHERE ${realEmployers()} ORDER BY created_at`),
@@ -117,15 +113,11 @@ export async function loadDashboardBoard(now: Date = new Date()) {
   const proposalsByIntern = Map.groupBy(proposals, (p) => String(p.intern_id));
 
   // ---------- Meetings ----------
-  const meetings: BoardMeeting[] = meetingsRaw.map((m) => {
-    const startsAt = m.selected_slot === 1 ? m.slot1 : m.selected_slot === 2 ? m.slot2 : m.selected_slot === 3 ? m.slot3 : null;
-    const outcome = meetOutcome({ status: String(m.status), startsAt: startsAt ? new Date(startsAt as string) : null, cancelledBy: m.cancelled_by as string | null }, NOW);
-    const stage = MEET_STAGE[outcome];
-    return {
-      id: String(m.id), internId: String(m.intern_id), employerId: String(m.employer_id), employer: String(m.company_name ?? ""), stage, startsAt: iso(startsAt),
-      ...meetingDetail({ stage, cancelledBy: str(m.cancelled_by), cancelReason: str(m.cancel_reason), notes: str(m.notes) }),
-    };
-  });
+  // The stage comes from meeting-stage.ts (interviewLifecycle first), never raw interviews.status: a picked time that
+  // passed unmarked reads expired, and a booked one reads upcoming, as on /admin/meetings.
+  const meetings: BoardMeeting[] = meetingsLoaded.rows.map((m) => ({
+    id: m.id, internId: m.internId, employerId: m.employerId, employer: m.company, stage: m.stage, startsAt: m.startsAt, reason: m.reason, feedback: m.feedback,
+  }));
 
   // ---------- Students ----------
   const students: BoardStudent[] = internsRaw.map((u) => {

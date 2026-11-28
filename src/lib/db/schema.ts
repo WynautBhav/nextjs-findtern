@@ -306,6 +306,25 @@ export const adminAuditLog = pgTable("admin_audit_log", {
 
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 
+/**
+ * Master data follow-ups (0057). A log, never edited: the newest row for a target is its current status and note; the
+ * older rows are its history. target_type: student | employer | college. status: pending | followed_up | responded |
+ * no_response | escalated (lib/admin/follow-ups.ts). admin_id is the admin who wrote it, as on admin_audit_log.
+ */
+export const adminFollowUps = pgTable("admin_follow_ups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  targetType: text("target_type").notNull(),
+  targetId: text("target_id").notNull(),
+  status: text("status").notNull(),
+  note: text("note"),
+  adminId: varchar("admin_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  adminFollowUpsTargetIdx: index("admin_follow_ups_target_idx").on(t.targetType, t.targetId, t.createdAt),
+}));
+
+export type AdminFollowUp = typeof adminFollowUps.$inferSelect;
+
 /** Sessions ended by logout. The cookie is self-contained, so a copied one is refused by sid until it would have expired. */
 export const revokedSessions = pgTable("revoked_sessions", {
   sid: text("sid").primaryKey(),

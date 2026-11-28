@@ -53,6 +53,10 @@ const RULES: Rule[] = [
   ["/admin/dashboard", ["dashboard:read"]],
   ["/admin/proposal-tracker", ["interns:read"], ["interns:write"]],
   ["/admin/ai-interviews", ["interns:read"], ["interns:write"]],
+  // Meeting pipeline: real interviews and drive calls (both sides take part), like meeting reviews.
+  ["/admin/meetings", ["interns:read", "companies:read"], ["interns:write", "companies:write"]],
+  // Master data: students, employers and colleges in one place; follow-ups are written through /api/admin/follow-ups.
+  ["/admin/master-data", ["interns:read", "companies:read"], ["interns:write", "companies:write"]],
   ["/admin/cgpa-verifications", ["interns:read"], ["interns:write"]],
   // Meeting reviews: either side may be warned, so either read/write permission opens it; the route then needs the write of the PARTY chosen.
   ["/admin/meeting-reviews", ["interns:read", "companies:read"], ["interns:write", "companies:write"]],
@@ -99,6 +103,7 @@ const RULES: Rule[] = [
   ["/api/admin/ai-reports", ["interns:read"], ["interns:write"]],
   ["/api/admin/cgpa-verifications", ["interns:read"], ["interns:write"]],
   ["/api/admin/meeting-reviews", ["interns:read", "companies:read"], ["interns:write", "companies:write"]],
+  ["/api/admin/meetings", ["interns:read", "companies:read"]],
   // Employer subscriptions are money: grant, revoke and the price are Accounts (transactions:write).
   ["/api/admin/subscriptions", ["transactions:read"], ["transactions:write"]],
   // The expired-offers and expired-AI-interviews CSV (tracker and AI interviews tabs).
@@ -113,6 +118,7 @@ const RULES: Rule[] = [
   ["/api/admin/drive-overview", ["companies:read"], ["companies:write"]],
   ["/api/admin/refunds", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/projects", ["companies:read"], ["companies:write"]],
+  ["/api/admin/follow-ups", ["interns:read", "companies:read"], ["interns:write", "companies:write"]],
   ["/api/admin/users", ["users:read"], ["interns:write"]],
   ["/api/admin/contact", ["users:read"], ["interns:write", "companies:write"]],
   // /api/admin/impersonate has no rule on purpose: no rule = super admin only.

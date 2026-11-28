@@ -34,7 +34,7 @@ const fmt = (n: number) => n.toLocaleString("en-IN");
 const AI_LABEL: Record<string, string> = { not_applied: "Not applied", applied: "Applied", scheduled: "Scheduled", sent: "Link sent", expired: "Expired", completed: "Interviewed" };
 const REPLY_LABEL: Record<BoardOffer["reply"], string> = { pending: "No reply yet", accepted: "Accepted", rejected: "Rejected", expired: "Expired", withdrawn: "Withdrawn" };
 const REPLY_TONE: Record<BoardOffer["reply"], NonNullable<DrawerRow["chip"]>["tone"]> = { pending: "wait", accepted: "good", rejected: "bad", expired: "plain", withdrawn: "plain" };
-const STAGE_LABEL: Record<BoardMeeting["stage"], string> = { sent: "Waiting for the student", accepted: "Accepted", completed: "Completed", expired: "Expired", withdrawn: "Withdrawn" };
+const STAGE_LABEL: Record<BoardMeeting["stage"], string> = { sent: "Waiting for the student", accepted: "Accepted", completed: "Completed", declined: "Declined", expired: "Expired", withdrawn: "Withdrawn" };
 const FTE_LABEL: Record<string, string> = { none: "FTE: none", applied: "FTE requested", approved: "FTE approved" };
 const dateOf = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }) : "—");
 /** "3 h ago", "Online now", "Never", "Hidden": the student's last seen, worded for a list. */
@@ -508,6 +508,7 @@ function StudentsView({ data, track, setTrack, open, links }: { data: DashboardB
                   ["Completed", "completed", C_MAIN, m.meetsCompleted],
                   ["Upcoming", "upcoming", C_SOFT, m.meetsUpcoming],
                   ["Waiting", "awaiting reply", "var(--color-brand-200)", m.meetingsAwaiting],
+                  ["Declined", "declined", C_INK, m.meetsDeclined],
                   ["Expired", "expired", C_WAIT, m.meetsExpired],
                   ["Withdrawn", "withdrawn", C_GREY, m.meetsWithdrawn],
                 ] as const

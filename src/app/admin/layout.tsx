@@ -7,6 +7,8 @@ import {
   BarChart3,
   Bell,
   Briefcase,
+  CalendarClock,
+  Table2,
   Building2,
   CircleUserRound,
   ClipboardCheck,
@@ -65,6 +67,7 @@ const NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
       { href: "/admin/proposal-tracker", label: "Proposal pipeline", icon: <Send /> },
+      { href: "/admin/meetings", label: "Meeting pipeline", icon: <CalendarClock /> },
       { href: "/admin/ai-interviews", label: "AI interviews", icon: <Video /> },
       { href: "/admin/messages", label: "Messages", icon: <MessageSquare /> },
       // A daily queue (stipends due), so it sits with the daily work rather
@@ -75,6 +78,7 @@ const NAV: AdminNavGroup[] = [
   {
     title: "People and work",
     items: [
+      { href: "/admin/master-data", label: "Master data", icon: <Table2 /> },
       { href: "/admin/interns", label: "Candidates", icon: <Users /> },
       { href: "/admin/cgpa-verifications", label: "CGPA checks", icon: <ClipboardCheck /> },
       { href: "/admin/meeting-reviews", label: "Meeting reviews", icon: <Mic /> },
@@ -165,6 +169,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       payouts: hasItem("/admin/payouts"),
       candidates: hasItem("/admin/interns"),
       pipeline: hasItem("/admin/proposal-tracker"),
+      meetings: hasItem("/admin/meetings"),
       collegePayouts: hasItem("/admin/colleges"),
     }),
     // Interns waiting for Findtern to check their CGPA; a failed read is 0 inside, so no badge rather than a broken rail.
@@ -179,7 +184,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     "/admin/messages": { count: unreadMessages, note: "unread" },
     "/admin/payouts": { count: queue.payouts, note: "due" },
     "/admin/interns": { count: queue.candidates, note: "awaiting a score" },
-    "/admin/proposal-tracker": { count: queue.pipeline, note: "need action" },
+    "/admin/proposal-tracker": { count: queue.pipeline, note: "waiting on payment" },
+    "/admin/meetings": { count: queue.meetingsNoLink, note: "need a meeting link" },
     "/admin/colleges": { count: queue.collegePayouts, note: "withdrawals to pay" },
     "/admin/cgpa-verifications": { count: cgpaPending, note: "to verify" },
     "/admin/meeting-reviews": { count: meetingReviewsPending, note: "to review" },

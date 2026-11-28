@@ -2,8 +2,9 @@ import { and, count, eq, sql } from "drizzle-orm";
 import { isNewestOnboarding } from "@/lib/onboarding-newest";
 
 import { getDb, schema } from "@/lib/db";
-import { AI_INTERVIEW_EMAIL, realEmployerId, TEST_EMPLOYER_ID } from "@/lib/admin/scope";
+import { acceptedUnpaidWhere, AI_INTERVIEW_EMAIL, realEmployerId, TEST_EMPLOYER_ID } from "@/lib/admin/scope";
 import { settleCount } from "@/lib/admin/queue-badge";
+import { meetingsNoLinkWhere } from "@/lib/admin/meetings-load";
 
 /**
  * Counts for the rail's live queue (Payouts, Candidates, Proposal pipeline).
@@ -16,14 +17,11 @@ import { settleCount } from "@/lib/admin/queue-badge";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The selected slot of an interview, in SQL. */
-const SELECTED_SLOT = sql`(CASE ${schema.interviews.selectedSlot} WHEN 1 THEN ${schema.interviews.slot1} WHEN 2 THEN ${schema.interviews.slot2} WHEN 3 THEN ${schema.interviews.slot3} END)`;
-
 /** An AI-interview row (the internal "admin" employer or the AI employer). */
 const AI_INTERVIEW = sql`(i.employer_id = ${TEST_EMPLOYER_ID} OR i.employer_id IN (SELECT id FROM ${schema.employers} WHERE lower(company_email) = ${AI_INTERVIEW_EMAIL}))`;
 
-export type QueueWant = { payouts: boolean; candidates: boolean; pipeline: boolean; collegePayouts?: boolean };
-export type QueueCounts = { payouts: number | null; candidates: number | null; pipeline: number | null; collegePayouts: number | null };
+export type QueueWant = { payouts: boolean; candidates: boolean; pipeline: boolean; collegePayouts?: boolean; meetings?: boolean };
+export type QueueCounts = { payouts: number | null; candidates: number | null; pipeline: number | null; collegePayouts: number | null; meetingsNoLink: number | null };
 
 /** Stipend payouts due now or within 3 days with no bank reference yet. */
 function payoutsDue(): Promise<number | null> {
@@ -60,21 +58,23 @@ function candidatesAwaitingScore(): Promise<number | null> {
   });
 }
 
-/** Upcoming employer interviews with no meeting link, plus accepted offers waiting on payment. */
+/** Accepted offers waiting on payment. (Interviews with no meeting link moved to meetingsNoLink.) */
 function pipelineNeedingAction(): Promise<number | null> {
   return settleCount(async () => {
     const res = await getDb().execute<{ value: number }>(sql`
       SELECT (
-        SELECT count(*) FROM ${schema.interviews}
-         WHERE ${schema.interviews.status} = 'scheduled'
-           AND ${realEmployerId(schema.interviews.employerId)}
-           AND ${SELECTED_SLOT} > now()
-           AND coalesce(trim(${schema.interviews.meetingLink}), '') = ''
-      ) + (
         SELECT count(*) FROM ${schema.proposals}
-         WHERE ${schema.proposals.status} = 'accepted'
+         WHERE ${acceptedUnpaidWhere()}
            AND ${realEmployerId(schema.proposals.employerId)}
       ) AS value`);
+    return res.rows[0]?.value ?? 0;
+  });
+}
+
+/** Upcoming employer interviews with no meeting link: the rows /admin/meetings?nolink=1 lists (meetingsNoLinkWhere). */
+export function meetingsNoLink(): Promise<number | null> {
+  return settleCount(async () => {
+    const res = await getDb().execute<{ value: number }>(sql`SELECT count(*)::int AS value FROM ${schema.interviews} WHERE ${meetingsNoLinkWhere()}`);
     return res.rows[0]?.value ?? 0;
   });
 }
@@ -88,11 +88,12 @@ function collegePayoutsOpen(): Promise<number | null> {
 }
 
 export async function loadQueueCounts(want: QueueWant): Promise<QueueCounts> {
-  const [payouts, candidates, pipeline, collegePayouts] = await Promise.all([
+  const [payouts, candidates, pipeline, collegePayouts, meetingsNoLinkCount] = await Promise.all([
     want.payouts ? payoutsDue() : null,
     want.candidates ? candidatesAwaitingScore() : null,
     want.pipeline ? pipelineNeedingAction() : null,
     want.collegePayouts ? collegePayoutsOpen() : null,
+    want.meetings ? meetingsNoLink() : null,
   ]);
-  return { payouts, candidates, pipeline, collegePayouts };
+  return { payouts, candidates, pipeline, collegePayouts, meetingsNoLink: meetingsNoLinkCount };
 }

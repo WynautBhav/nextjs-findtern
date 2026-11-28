@@ -8,6 +8,7 @@ import { isHiredProposal } from "../hire-status.ts";
 import { feedbackTextOf } from "../interview-feedback.ts";
 import { effectiveProposalStatus, type ExpiryInput } from "../proposal-expiry.ts";
 import { proposalOutcome } from "../proposals.ts";
+import type { MeetingStage } from "./meeting-stage.ts";
 
 export type BoardView = "students" | "employers" | "colleges";
 export const BOARD_VIEWS: { key: BoardView; label: string }[] = [
@@ -22,7 +23,8 @@ export type Track = "tech" | "non_tech";
 export type TrackFilter = "all" | Track;
 export type Guarantee = "active" | "ended" | "none";
 export type OfferReply = "pending" | "accepted" | "rejected" | "expired" | "withdrawn";
-export type MeetStage = "sent" | "accepted" | "completed" | "expired" | "withdrawn";
+/** One stage per meeting (meeting-stage.ts): the dashboard and /admin/meetings count the same rows. */
+export type MeetStage = MeetingStage;
 
 export type BoardStudent = {
   id: string;
@@ -206,10 +208,11 @@ export function studentMetrics(
     offersAwaiting: off(offers.filter((o) => o.reply === "pending")),
     meetingsAwaiting: meet(meetings.filter((m) => m.stage === "sent")),
     // Meetings: the total splits into completed, upcoming (accepted, not yet held), waiting (meetingsAwaiting: no
-    // reply yet), expired and withdrawn.
+    // reply yet), declined, expired and withdrawn.
     meetsAll: meet(meetings),
     meetsCompleted: meet(meetings.filter((m) => m.stage === "completed")),
     meetsUpcoming: meet(meetings.filter((m) => m.stage === "accepted")),
+    meetsDeclined: meet(meetings.filter((m) => m.stage === "declined")),
     meetsExpired: meet(meetings.filter((m) => m.stage === "expired")),
     meetsWithdrawn: meet(meetings.filter((m) => m.stage === "withdrawn")),
     // Each offer type: its total, split by the student's reply (the five parts add up to the total).

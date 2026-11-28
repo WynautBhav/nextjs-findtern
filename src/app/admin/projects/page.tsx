@@ -1,128 +1,44 @@
-import Link from "next/link";
-import { and, asc, count, desc, eq, not, sql, type SQL } from "drizzle-orm";
-import { Download } from "lucide-react";
-
-import { getDb, schema } from "@/lib/db";
-import { q } from "@/lib/college/sql";
-import { formatDate, formatNumber } from "@/lib/format";
-import { flattenParams, parsePageRequest, searchAny, toPage, toQueryString } from "@/lib/admin/params";
-import { openProject, realEmployerId } from "@/lib/admin/scope";
-import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { getSession } from "@/lib/auth";
+import { canWrite } from "@/lib/admin/permissions";
+import { flattenParams, toQueryString } from "@/lib/admin/params";
+import { COMPANIES_PER_PAGE, loadProjectsBoard, MODE_FILTERS, parseProjectsQuery, projectsExportHref, STATUS_FILTERS, type ProjectsBoard as Board } from "@/lib/admin/projects-board";
+import { formatNumber } from "@/lib/format";
+import { AdminEmpty, AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
-import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
-import { StatusBadge } from "@/components/admin/status-badge";
-import { ButtonAnchor } from "@/components/ui/button";
-import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
-import { TakedownAction } from "./takedown-action";
+import { Pagination } from "@/components/admin/pagination";
+import { TableToolbar } from "@/components/admin/table-toolbar";
+import { ProjectsBoard } from "./projects-board";
 
 /**
- * Projects (legacy admin-projects.tsx). "Active" is the shared rule: any
- * project not closed, with a blank status counting as active; "Closed" also
- * covers legacy's "inactive" and "archived" (ADP-13).
+ * Projects, grouped by company and paged by company (COMPANIES_PER_PAGE). The view tabs count every real employer's
+ * projects with the same rule the list filters by (projects-board.ts VIEW_SQL); the switch on each row is the existing
+ * takedown / restore.
  */
-
-const SORTS = ["name", "company", "proposals", "posted"] as const;
-
-/** Open to candidates: a live posting that has not been taken down (a taken-down project keeps its old status). */
-
-const proposalCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.project_id = ${q(schema.projects, schema.projects.id)})`;
-
 export default async function AdminProjectsPage({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = flattenParams(await searchParams);
-  const req = parsePageRequest(params);
-  const sort = parseSort(params, SORTS, { key: "posted", dir: "desc" });
+  const query = parseProjectsQuery(params);
+  const session = await getSession();
+  // The page path has no write rule of its own; the takedown / restore routes need companies:write.
+  const mayWrite = canWrite(session?.permissions, "/api/admin/projects");
 
-  const conditions: (SQL | undefined)[] = [
-    searchAny([sql`${schema.projects.projectName}`, sql`${schema.employers.companyName}`, sql`${schema.projects.skills}::text`], req.search),
-    realEmployerId(schema.projects.employerId),
-    params.status === "active" ? openProject() : params.status === "closed" ? not(openProject()) : undefined,
-    params.type === "full_time" ? eq(schema.projects.fullTimeOffer, true) : undefined,
-    params.type === "internship" ? sql`coalesce(${schema.projects.fullTimeOffer}, false) = false` : undefined,
-  ];
-  const where = and(...conditions.filter((c): c is SQL => Boolean(c)));
-
-  const sortExpr: Record<(typeof SORTS)[number], SQL> = {
-    name: sql`lower(${schema.projects.projectName})`,
-    company: sql`lower(${schema.employers.companyName})`,
-    proposals: proposalCount,
-    posted: sql`${schema.projects.createdAt}`,
-  };
-
-  const db = getDb();
-  let loaded;
+  let board: Board | null = null;
   try {
-    const [rows, [totalRow], [all], [active], [fullTime], [proposals]] = await Promise.all([
-      db
-        .select({
-          id: schema.projects.id,
-          projectName: schema.projects.projectName,
-          status: schema.projects.status,
-          fullTimeOffer: schema.projects.fullTimeOffer,
-          locationType: schema.projects.locationType,
-          city: schema.projects.city,
-          timezone: schema.projects.timezone,
-          skills: schema.projects.skills,
-          createdAt: schema.projects.createdAt,
-          employerId: schema.projects.employerId,
-          employerName: schema.employers.companyName,
-          takenDownAt: schema.projects.takenDownAt,
-          takenDownReason: schema.projects.takenDownReason,
-          proposalCount,
-          isActive: sql<boolean>`${openProject()}`,
-        })
-        .from(schema.projects)
-        .innerJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
-        .where(where)
-        .orderBy(sort.dir === "asc" ? asc(sortExpr[sort.key]) : desc(sortExpr[sort.key]), desc(schema.projects.createdAt))
-        .limit(req.perPage)
-        .offset(req.offset),
-      db
-        .select({ c: count() })
-        .from(schema.projects)
-        .innerJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
-        .where(where),
-      db.select({ c: count() }).from(schema.projects).where(realEmployerId(schema.projects.employerId)),
-      db.select({ c: count() }).from(schema.projects).where(and(openProject(), realEmployerId(schema.projects.employerId))),
-      db.select({ c: count() }).from(schema.projects).where(and(eq(schema.projects.fullTimeOffer, true), realEmployerId(schema.projects.employerId))),
-      db.select({ c: count() }).from(schema.proposals).where(realEmployerId(schema.proposals.employerId)),
-    ]);
-    loaded = {
-      rows,
-      total: Number(totalRow?.c ?? 0),
-      all: Number(all?.c ?? 0),
-      active: Number(active?.c ?? 0),
-      fullTime: Number(fullTime?.c ?? 0),
-      proposals: Number(proposals?.c ?? 0),
-    };
+    board = await loadProjectsBoard(query);
   } catch (error) {
     console.error("[admin/projects]", error);
-    loaded = null;
   }
 
-  const exportHref = `/api/admin/export?type=projects&${new URLSearchParams(params).toString()}`;
-  const headerWith = (subtitle?: string) => (
-    <AdminPageHeader
-      title="Projects"
-      subtitle={subtitle}
-      action={
-        <div className="flex flex-wrap gap-2">
-        <ButtonAnchor href={exportHref} variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
-          <Download className="size-4" aria-hidden />
-          Export CSV
-        </ButtonAnchor>
-        </div>
-      }
-    />
-  );
-  const header = headerWith();
-  if (!loaded) {
+  const exportHref = projectsExportHref(params);
+
+  const header = (subtitle?: string) => <AdminPageHeader title="Projects" subtitle={subtitle} />;
+  if (!board) {
     return (
       <div className="space-y-6">
-        {header}
+        {header()}
         <Panel>
           <AdminLoadError what="the project list" retryHref="/admin/projects" />
         </Panel>
@@ -130,126 +46,68 @@ export default async function AdminProjectsPage({
     );
   }
 
-  const page = toPage(loaded.rows, loaded.total, req.page, req.perPage);
-  const filtered = Boolean(req.search || params.status || params.type);
-
-  // Active / closed / full-time are views (the counts were stat tiles); the filters keep the same URL keys.
-  const viewHref = (patch: Record<string, string>) => `/admin/projects${toQueryString({ ...params, status: "", type: "", ...patch, page: "" })}`;
+  const v = board.views;
+  const viewHref = (patch: Record<string, string>) => `/admin/projects${toQueryString({ ...params, status: "", type: "", page: "", ...patch })}`;
   const views: AdminTabItem[] = [
-    { key: "all", label: "All projects", count: loaded.all, href: viewHref({}) },
-    { key: "active", label: "Active", count: loaded.active, href: viewHref({ status: "active" }) },
-    { key: "closed", label: "Closed", count: Math.max(0, loaded.all - loaded.active), href: viewHref({ status: "closed" }) },
-    { key: "full_time", label: "Full-time potential", count: loaded.fullTime, href: viewHref({ type: "full_time" }) },
+    { key: "all", label: "All projects", count: v.all, href: viewHref({}) },
+    { key: "active", label: "Active", count: v.active, href: viewHref({ status: "active" }) },
+    { key: "deactivated", label: "Deactivated", count: v.deactivated, href: viewHref({ status: "deactivated" }) },
+    { key: "full_time", label: "Full-time", count: v.full_time, href: viewHref({ type: "full_time" }) },
   ];
   const activeView =
-    params.status === "active" && !params.type
-      ? "active"
-      : params.status === "closed" && !params.type
-        ? "closed"
-        : params.type === "full_time" && !params.status
-          ? "full_time"
-          : !params.status && !params.type
-            ? "all"
-            : "";
+    !query.type && !query.status ? "all" : !query.type && (query.status === "active" || query.status === "deactivated") ? query.status : query.type === "full_time" && !query.status ? "full_time" : "";
+  const filtered = Boolean(query.q || query.status || query.type || query.mode || query.city);
+  const shownProjects = board.companies.reduce((n, c) => n + c.projects.length, 0);
 
   return (
     <div className="space-y-4">
-      {headerWith(
-        `${formatNumber(loaded.all)} projects, ${formatNumber(loaded.active)} open to candidates, with ${formatNumber(loaded.proposals)} proposals sent across them.`,
-      )}
+      {header(`${formatNumber(v.all)} projects from real companies, ${formatNumber(v.active)} open to candidates and ${formatNumber(v.deactivated)} deactivated by Findtern.`)}
 
       <AdminTabs items={views} active={activeView} label="Project views" />
 
-      <DataTable
-        basePath="/admin/projects"
-        params={params}
-        page={page.page}
-        pages={page.pages}
-        total={page.total}
-        perPage={page.perPage}
-        rows={loaded.rows}
-        noun="projects"
-        caption="Projects"
+      <TableToolbar
         searchPlaceholder="Search project, company or skill…"
-        empty={
-          filtered
-            ? { title: "No project matches", body: "Nothing matches this search and these filters.", action: { href: "/admin/projects", label: "Clear filters" } }
-            : { title: "No projects yet", body: "Projects appear here once a company posts one." }
-        }
+        exportHref={exportHref}
         filters={[
-          {
-            key: "type",
-            label: "Offer type",
-            options: [
-              { value: "full_time", label: "Full-time potential" },
-              { value: "internship", label: "Internship only" },
-            ],
-          },
-        ]}
-        columns={[
-          {
-            header: "Project",
-            sort: "name",
-            cell: (row) => (
-              // Long names wrap to two lines rather than widen the table past
-              // its card at 1440 (QA-140).
-              <div className="min-w-0 whitespace-normal lg:max-w-xs">
-                <p className="line-clamp-2 break-words font-medium text-foreground" title={row.projectName}>
-                  {row.projectName}
-                </p>
-                <p className="truncate text-[0.8125rem] text-text-subtle" title={(row.skills ?? []).join(", ")}>
-                  {row.skills?.length ? row.skills.slice(0, 4).join(", ") : "No skills listed"}
-                </p>
-              </div>
-            ),
-          },
-          {
-            header: "Company",
-            sort: "company",
-            cell: (row) => (
-              <IdentityCell name={row.employerName} id={row.employerId} href={`/admin/companies/${row.employerId}?tab=projects`} size="sm" className="lg:max-w-52" />
-            ),
-          },
-          {
-            header: "Where",
-            cell: (row) => (
-              <div className="min-w-0 lg:max-w-36">
-                <p className="truncate capitalize">{row.locationType || "Remote"}</p>
-                {row.city || row.timezone ? <p className="truncate text-[0.8125rem] text-text-subtle">{row.city || row.timezone}</p> : null}
-              </div>
-            ),
-          },
-          {
-            header: "Type",
-            cell: (row) => <StatusBadge tone={row.fullTimeOffer ? "info" : "neutral"} label={row.fullTimeOffer ? "Full-time potential" : "Internship"} dot={false} />,
-          },
-          {
-            header: "Proposals",
-            sort: "proposals",
-            numeric: true,
-            cell: (row) => (
-              <Link href={`/admin/proposal-tracker?company=${row.employerId}`} className="font-medium text-foreground hover:underline">
-                {row.proposalCount}
-              </Link>
-            ),
-          },
-          {
-            header: "Status",
-            cell: (row) =>
-              row.takenDownAt ? (
-                <div className="min-w-0 whitespace-normal lg:max-w-40">
-                  <StatusBadge tone="danger" label="Taken down" />
-                  <p className="mt-1 line-clamp-2 whitespace-pre-line break-words text-[0.8125rem] text-text-subtle" title={row.takenDownReason ?? ""}>{row.takenDownReason}</p>
-                  <Link href={`/admin/messages?q=${encodeURIComponent(row.id)}`} className="mt-1 inline-block text-[0.8125rem] font-medium text-primary underline-offset-4 hover:underline">Messages about this project</Link>
-                </div>
-              ) : (
-                <StatusBadge value={row.isActive ? "active" : "closed"} />
-              ),
-          },
-          { header: "Posted", sort: "posted", cell: (row) => <span className="nums whitespace-nowrap text-text-subtle">{formatDate(row.createdAt)}</span> },
-          { header: "Moderation", cell: (row) => <TakedownAction id={row.id} name={row.projectName} takenDown={Boolean(row.takenDownAt)} /> },
+          { key: "status", label: "Status", options: [...STATUS_FILTERS] },
+          { key: "type", label: "Engagement", options: [{ value: "full_time", label: "Full-time" }, { value: "internship", label: "Internship" }] },
+          { key: "mode", label: "Work mode", options: [...MODE_FILTERS] },
+          { key: "city", label: "City", options: board.cities.map((c) => ({ value: c, label: c })) },
         ]}
       />
+
+      {board.companies.length === 0 ? (
+        <Panel>
+          {filtered ? (
+            <AdminEmpty title="No project matches" body="Nothing matches this search and these filters." action={{ href: "/admin/projects", label: "Clear filters" }} />
+          ) : (
+            <AdminEmpty title="No projects yet" body="Projects appear here once a company posts one." />
+          )}
+        </Panel>
+      ) : (
+        <>
+          <ProjectsBoard
+            key={`${board.page}:${toQueryString(params)}`}
+            companies={board.companies}
+            canWrite={mayWrite}
+            summary={`${formatNumber(board.totalProjects)} ${board.totalProjects === 1 ? "project" : "projects"} from ${formatNumber(board.totalCompanies)} ${board.totalCompanies === 1 ? "company" : "companies"}${board.pages > 1 ? `, ${formatNumber(shownProjects)} on this page` : ""}.`}
+          />
+          {board.pages > 1 ? (
+            <Panel>
+              <Pagination
+                page={board.page}
+                pages={board.pages}
+                total={board.totalCompanies}
+                perPage={COMPANIES_PER_PAGE}
+                rowsShown={board.companies.length}
+                params={params}
+                basePath="/admin/projects"
+                noun="companies"
+              />
+            </Panel>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

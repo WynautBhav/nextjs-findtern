@@ -7,8 +7,9 @@ import { dbTimestamp, getDb, schema } from "@/lib/db";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { formatMoney, shortDate, shortDateTime } from "@/lib/format";
 import { formatPeriodDays } from "@/lib/timesheet-days";
-import { AI_INTERVIEW_EMAIL, inrMinorSql, realEmployerId, TEST_EMPLOYER_ID } from "@/lib/admin/scope";
+import { acceptedUnpaidWhere, AI_INTERVIEW_EMAIL, inrMinorSql, realEmployerId, TEST_EMPLOYER_ID } from "@/lib/admin/scope";
 import { loadNetCollectedLastDays } from "@/lib/admin/receivables-load";
+import { meetingsNoLinkWhere } from "@/lib/admin/meetings-load";
 import type { DashboardQueues, MoneyStuck, QueueGroup, QueueKey, QueueRecord } from "@/lib/admin/dashboard-queues.types";
 import {
   ageInDays,
@@ -72,7 +73,7 @@ const META: Record<QueueKey, Meta> = {
     key: "nolink",
     label: "Upcoming interviews with no meeting link",
     detail: "Neither side can join until a link is saved.",
-    moreHref: "/admin/proposal-tracker?tab=interviews",
+    moreHref: "/admin/meetings?nolink=1",
     moreLabel: "Add links",
   },
   unscored: {
@@ -93,7 +94,7 @@ const META: Record<QueueKey, Meta> = {
     key: "accepted",
     label: "Accepted offers waiting on employer payment",
     detail: "The hire only completes once the employer pays. A nudge usually moves these.",
-    moreHref: "/admin/proposal-tracker?tab=proposals",
+    moreHref: "/admin/proposal-tracker?status=accepted&pay=unpaid",
     moreLabel: "See offers",
   },
   sheets: {
@@ -237,8 +238,8 @@ async function loadAccepted(now: Date): Promise<Result & Pick<MoneyStuck, "owedB
     .from(pr)
     .leftJoin(schema.users, eq(schema.users.id, pr.internId))
     .leftJoin(schema.employers, eq(schema.employers.id, pr.employerId))
-    // Today's definition (and the rail's): status accepted, test employers out.
-    .where(and(eq(pr.status, "accepted"), realEmployerId(pr.employerId)))
+    // The pipeline's "Accepted · waiting on payment" (and the sidebar badge's): not past its start day, test employers out.
+    .where(and(acceptedUnpaidWhere(), realEmployerId(pr.employerId)))
     .orderBy(pr.updatedAt)
     .limit(ACCEPTED_LOAD_CAP);
 
@@ -276,12 +277,8 @@ async function loadAccepted(now: Date): Promise<Result & Pick<MoneyStuck, "owedB
 async function loadNoLink(weekAgo: Date): Promise<Result> {
   const db = getDb();
   const iv = schema.interviews;
-  const where = and(
-    eq(iv.status, "scheduled"),
-    realEmployerId(iv.employerId),
-    sql`${SELECTED_SLOT} > now()`,
-    sql`coalesce(trim(${iv.meetingLink}), '') = ''`,
-  )!;
+  // The same rows /admin/meetings?nolink=1 lists (meeting-stage.ts needsMeetingLink).
+  const where = meetingsNoLinkWhere();
   const [[agg], rows] = await Promise.all([
     db
       .select({ value: count(), fresh: sql<number>`count(*) filter (where ${iv.createdAt} >= ${weekAgo})` })
@@ -317,7 +314,7 @@ async function loadNoLink(weekAgo: Date): Promise<Result> {
       amountMinorInr: null,
       ageDays: null,
       when: isoOrNull(slot),
-      href: "/admin/proposal-tracker?tab=interviews",
+      href: "/admin/meetings?nolink=1",
       props: [
         { label: "Slot", value: slotText },
         { label: "Company", value: company || "Not recorded" },

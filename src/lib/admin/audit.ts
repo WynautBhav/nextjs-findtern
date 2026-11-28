@@ -138,10 +138,12 @@ export const AUDIT_ACTIONS = {
   "auth.admin_logout": "Signed out of the admin",
   "export.companies": "Exported companies",
   "export.projects": "Exported internship postings",
+  "export.meetings": "Exported meetings (meeting pipeline)",
   "export.proposals": "Exported offers (proposal tracker)",
   "export.cgpa": "Exported the CGPA checks",
   "cgpa.employer_confirmed": "An employer confirmed a candidate's corrected CGPA",
   "proposal.hired": "An offer became a hire",
+  "follow_up.set": "Set a follow-up status or note (Master data)",
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;
