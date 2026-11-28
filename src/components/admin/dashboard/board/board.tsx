@@ -10,6 +10,7 @@ import {
   employerMetrics,
   SIZE_UNKNOWN,
   pct,
+  funnel,
   stackOf,
   studentMetrics,
   trackCounts,
@@ -264,12 +265,6 @@ const C_WAIT = "var(--color-accent-500)";
 const C_GREY = "var(--color-ink-300)";
 const C_INK = "var(--color-ink-600)";
 
-/** Ids in `a` that are not in `b`: the people waiting at a stop. */
-const minus = (a: MetricList, b: MetricList): MetricList => {
-  const s = new Set(b.ids);
-  return { kind: a.kind, ids: a.ids.filter((id) => !s.has(id)) };
-};
-
 // ---------- Students ----------
 
 /** The deep green hero every tab opens on: the finding in large type, the controls, then the line. */
@@ -364,28 +359,35 @@ function StudentsView({ data, track, setTrack, open, links }: { data: DashboardB
     return out;
   };
   const tag = track === "all" ? "" : track === "tech" ? " (tech)" : " (non-tech)";
-  const st = (key: string, label: string, list: MetricList, next: MetricList | null, extra: Partial<Station> = {}): Station => {
-    const waiting = next ? minus(list, next) : null;
+  // One journey: a stop counts everyone who got this far, so the drop between stops is exactly who waits there.
+  const path = funnel([m.signedUp.ids, m.profileComplete.ids, m.aiApplied.ids, m.aiInterviewed.ids, m.hired.ids]);
+  const st = (i: number, key: string, label: string, extra: Partial<Station> = {}): Station => {
+    const f = path[i];
+    const list: MetricList = { kind: "students", ids: f.reached };
+    const waiting: MetricList | null = i < path.length - 1 ? { kind: "students", ids: f.waiting } : null;
+    const skipped: MetricList = { kind: "students", ids: f.skipped };
+    const skipSpur = n(skipped) ? [{ key: "skip", label: "Moved on without it", count: n(skipped), onOpen: () => open(`${label}: moved on without it` + tag, skipped) }] : [];
     return {
       key, label, reached: n(list), waiting: waiting ? n(waiting) : undefined,
       faces: waiting ? faces(waiting, 4) : undefined,
       onOpenWaiting: waiting ? () => open(label + tag, list, waiting) : undefined,
       onOpen: () => open(label + tag, list, waiting ?? undefined),
       ...extra,
+      spurs: [...skipSpur, ...(extra.spurs ?? [])],
     };
   };
   const stations: Station[] = [
-    st("signedUp", "Signed up", m.signedUp, m.profileComplete),
-    st("profile", "Profile completed", m.profileComplete, m.aiApplied),
-    st("applied", "Applied for AI interview", m.aiApplied, m.aiInterviewed, {
+    st(0, "signedUp", "Signed up"),
+    st(1, "profile", "Profile completed"),
+    st(2, "applied", "Applied for AI interview", {
       spurs: [
         { key: "pay", label: "Pending payment", count: n(m.pendingPayment), onOpen: () => open("Pending payment" + tag, m.pendingPayment) },
         { key: "sched", label: "Scheduled", count: n(m.aiScheduled), onOpen: () => open("AI interview scheduled" + tag, m.aiScheduled) },
       ],
     }),
-    st("interviewed", "AI interviewed", m.aiInterviewed, m.hired),
+    st(3, "interviewed", "AI interviewed"),
     {
-      ...st("hired", "Hired", m.hired, null, { tone: "end", caption: `${pct(n(m.hired), n(m.signedUp)) ?? 0}% of signups` }),
+      ...st(4, "hired", "Hired", { tone: "end", caption: `${pct(n(m.hired), n(m.signedUp)) ?? 0}% of signups` }),
       branch: [
         { key: "int", label: "Internship", count: n(m.hiredInternship), onOpen: () => open("Hired: internship" + tag, m.hiredInternship) },
         { key: "ft", label: "Full-time", count: n(m.hiredFullTime), onOpen: () => open("Hired: full-time" + tag, m.hiredFullTime) },
@@ -602,25 +604,32 @@ function EmployersView({ data, open }: { data: DashboardBoard; open: Open }) {
   const nameOf = useMemo(() => new Map(data.employers.map((e) => [e.id, e.company])), [data.employers]);
   const n = (l: MetricList) => l.ids.length;
   const faces = (l: MetricList, max = 6): Face[] => l.ids.slice(0, max).map((id) => ({ id, name: nameOf.get(id) ?? "Company" }));
-  const stop = (key: string, label: string, title: string, list: MetricList, next: MetricList | null, extra: Partial<Station> = {}): Station => {
-    const waiting = next ? minus(list, next) : null;
+  // Same journey rule as Students: a stop counts every employer who got this far.
+  const path = funnel([m.signedUp.ids, m.onboarded.ids, m.sentOffer.ids, m.madeHire.ids]);
+  const stop = (i: number, key: string, label: string, title: string, extra: Partial<Station> = {}): Station => {
+    const f = path[i];
+    const list: MetricList = { kind: "employers", ids: f.reached };
+    const waiting: MetricList | null = i < path.length - 1 ? { kind: "employers", ids: f.waiting } : null;
+    const skipped: MetricList = { kind: "employers", ids: f.skipped };
+    const skipSpur = n(skipped) ? [{ key: "skip", label: "Moved on without it", count: n(skipped), onOpen: () => open(`${title}: moved on without it`, skipped) }] : [];
     return {
       key, label, reached: n(list), waiting: waiting ? n(waiting) : undefined,
       faces: waiting ? faces(waiting, 4) : undefined,
       onOpenWaiting: waiting ? () => open(title, list, waiting) : undefined,
       onOpen: () => open(title, list, waiting ?? undefined),
       ...extra,
+      spurs: [...skipSpur, ...(extra.spurs ?? [])],
     };
   };
   const spur = (key: string, label: string, list: MetricList, title = label) => ({ key, label, count: n(list), onOpen: () => open(title, list) });
   const journey: Station[] = [
-    stop("signedUp", "Signed up", "All employers", m.signedUp, m.onboarded),
-    stop("onboarded", "Onboarded", "Onboarded employers", m.onboarded, m.sentOffer, {
+    stop(0, "signedUp", "Signed up", "All employers"),
+    stop(1, "onboarded", "Onboarded", "Onboarded employers", {
       spurs: [spur("drive", "In a campus drive now", m.inDriveNow), spur("fteReq", "FTE requested", m.fteRequested), spur("fteOk", "FTE approved", m.fteApproved)],
     }),
-    stop("sent", "Sent an offer", "Employers who sent an offer", m.sentOffer, m.madeHire),
+    stop(2, "sent", "Sent an offer", "Employers who sent an offer"),
     {
-      ...stop("hired", "Hired someone", "Employers who hired", m.madeHire, null, { tone: "end", caption: `${pct(n(m.madeHire), n(m.signedUp)) ?? 0}% of signups` }),
+      ...stop(3, "hired", "Hired someone", "Employers who hired", { tone: "end", caption: `${pct(n(m.madeHire), n(m.signedUp)) ?? 0}% of signups` }),
       branch: [spur("int", "Internship", m.hiredOnInternship, "Employers who hired on internship"), spur("ft", "Full-time", m.hiredOnFullTime, "Employers who hired full-time")],
     },
   ];
@@ -799,14 +808,14 @@ function CollegesView({ colleges, open, links }: { colleges: BoardCollege[]; ope
         {fmt(live.length)} of {fmt(colleges.length)} colleges have students on Findtern.{idle.length ? ` ${fmt(idle.length)} have none yet.` : ""}
       </p>
       {live.map((c) => {
+        const path = funnel(COLLEGE_STOPS.map((s) => c.funnel[s.k]));
         const stations: Station[] = COLLEGE_STOPS.map((s, i) => {
-          const ids = c.funnel[s.k];
-          const next = COLLEGE_STOPS[i + 1];
-          const nextSet = next ? new Set(c.funnel[next.k]) : null;
-          const waiting = nextSet ? ids.filter((id) => !nextSet.has(id)).length : undefined;
+          const f = path[i];
+          const last = i === COLLEGE_STOPS.length - 1;
           return {
-            key: s.k, label: s.l, reached: ids.length, waiting, tone: next ? "line" : "end",
-            onOpen: () => open(`${c.name} · ${s.l}`, list(ids), nextSet ? list(ids.filter((id) => !nextSet.has(id))) : undefined),
+            key: s.k, label: s.l, reached: f.reached.length, waiting: last ? undefined : f.waiting.length, tone: last ? "end" : "line",
+            onOpen: () => open(`${c.name} · ${s.l}`, list(f.reached), last ? undefined : list(f.waiting)),
+            spurs: f.skipped.length ? [{ key: "skip", label: "Moved on without it", count: f.skipped.length, onOpen: () => open(`${c.name} · ${s.l}: moved on without it`, list(f.skipped)) }] : undefined,
           };
         });
         return (

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   employerMetrics,
+  funnel,
   initials,
   stackOf,
   isIndianEmployer,
@@ -199,4 +200,25 @@ test("stackOf: at most 10 blocks, the 10th becomes +N when more are left", () =>
   assert.deepEqual(stackOf(ids(10)), { shown: ids(10), more: 0 });
   assert.deepEqual(stackOf(ids(24)), { shown: ids(9), more: 15 });
   assert.equal(stackOf(ids(24)).shown.length + 1, 10);
+});
+
+test("funnel: a station counts everyone who got this far, so stopped always equals waiting", () => {
+  // c and d finished the AI interview without a complete profile; e is only signed up.
+  const f = funnel([
+    ["a", "b", "c", "d", "e"], // signed up
+    ["a", "b"], // profile complete
+    ["a", "c", "d"], // AI interviewed
+    ["c"], // hired
+  ]);
+  assert.deepEqual(f.map((s) => s.reached.length), [5, 4, 3, 1]);
+  assert.deepEqual(f[1].reached, ["a", "b", "c", "d"]);
+  assert.deepEqual(f[1].skipped, ["c", "d"]); // moved on without a complete profile
+  assert.deepEqual(f.map((s) => s.waiting), [["e"], ["b"], ["a", "d"], []]);
+  for (let i = 0; i < f.length - 1; i++) {
+    assert.equal(f[i].reached.length - f[i + 1].reached.length, f[i].waiting.length, `stop ${i}: drop = waiting`);
+    assert.ok(f[i + 1].reached.every((id) => f[i].reached.includes(id)), `stop ${i + 1} is inside stop ${i}`);
+  }
+  // A clean, nested funnel is unchanged.
+  const clean = funnel([["a", "b"], ["a"]]);
+  assert.deepEqual([clean[0].reached, clean[0].skipped, clean[1].reached], [["a", "b"], [], ["a"]]);
 });

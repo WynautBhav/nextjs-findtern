@@ -258,3 +258,24 @@ export function stackOf(ids: string[], cap = 10) {
   if (ids.length <= cap) return { shown: ids, more: 0 };
   return { shown: ids.slice(0, cap - 1), more: ids.length - (cap - 1) };
 }
+
+export type FunnelStop = { reached: string[]; waiting: string[]; skipped: string[] };
+
+/**
+ * Milestones as a journey. Each step is the people who did that step; a stop counts everyone who did it or any later
+ * step (a student can be AI-interviewed with an unfinished profile), so every stop sits inside the one before and the
+ * drop between two stops is exactly the people waiting there. `skipped` is who moved on without doing this step.
+ */
+export function funnel(steps: string[][]): FunnelStop[] {
+  const out: FunnelStop[] = [];
+  let later: string[] = [];
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const own = new Set(steps[i]);
+    const reached = [...steps[i], ...later.filter((id) => !own.has(id))];
+    const after = new Set(later);
+    out[i] = { reached, waiting: reached.filter((id) => !after.has(id)), skipped: reached.filter((id) => !own.has(id)) };
+    later = reached;
+  }
+  out[steps.length - 1].waiting = [];
+  return out;
+}
